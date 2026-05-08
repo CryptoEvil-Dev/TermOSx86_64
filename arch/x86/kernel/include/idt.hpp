@@ -7,22 +7,27 @@ struct idt_entry_t {
 } __attribute__((packed));
 
 struct idtr_t {
-    uint16_t limit;
-    uint64_t base;
+    uint16_t limit; uint64_t base;
 } __attribute__((packed));
 
 struct interrupt_frame {
+    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
     uint64_t rdi, rsi, rbp, rbx, rdx, rcx, rax;
-    uint64_t interrupt_number, error_code;
-    uint64_t rip, cs, rflags, rsp, ss;
+    uint64_t rip, cs, rflags, rsp, ss; 
 };
 
-// ОБЪЯВЛЕНИЯ (БЕЗ выделения памяти)
-extern idt_entry_t idt[256];
-extern idtr_t idtr;
+// Ассемблерные заглушки из interrupts.asm
+extern "C" {
+    void isr0();  void irq32(); void irq33();
+}
 
-extern "C" void isr3(); // Для kernel.cpp
+// Глобальные состояния
+extern uint64_t ticks;
+
+// Интерфейс IDT
 void idt_init();
 void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags);
 
-void timer_init(uint8_t hz);
+// Интерфейс клавиатуры (для iostream)
+void kbd_init();
+char kbd_pop(); 

@@ -1,48 +1,56 @@
 #include "../include/idt.hpp"
+#include "../include/pic.hpp"
 #include "../include/io.hpp"
 #include "stdio.hpp"
 
-// ОПРЕДЕЛЕНИЯ (ВЫДЕЛЕНИЕ памяти)
-idt_entry_t idt[256] = { {0x1234, 0x18, 0, 0x8E, 0, 0, 0} };
+// Выделение памяти
+idt_entry_t idt[256];
 idtr_t idtr;
-
-// Список всех заглушек для компилятора
-extern "C" {
-    void isr0();
-    void isr32();
-    void isr33();
-}
-
 uint64_t ticks = 0;
 
-// IRQ 0 - System Clock
-extern "C" void IRQ0_SystemClock_Handler(interrupt_frame* frame) {
+// Кольцевой буфер клавиатуры
+static char kbd_buffer[256];
+static uint32_t kbd_head = 0, kbd_tail = 0;
+
+static const char kbd_us[128] = {
+    0,  27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
+    '\t', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n',
+    0, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', 0,
+    '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' '
+};
+
+// --- Обработчики (ISR/IRQ) ---
+
+extern "C" void isr0_handler(interrupt_frame* frame) {
+    term.set_color(WHITE, RED);
+    term.print("\nCPU EXCEPTION: DIVIDE BY ZERO\n");
+    while(1) { __asm__ volatile("hlt"); }
+}
+
+extern "C" void irq0_handler(interrupt_frame* frame) {
     ticks++;
-    // Например выводить "Tick" каждые 100 тиков (Примерно раз в секунду)
-    if(ticks % 100 == 0) {
-        term.print("Tick");
-    }
-
-    outb(0x20, 0x20); // EOI
+    PIC::send_eoi(0);
 }
 
-// IRQ 1 - PS2 Keyboard
-extern "C" void IRQ1_PS2Keyboard_Handler(interrupt_frame* frame) {
+extern "C" void irq1_handler(interrupt_frame* frame) {
     uint8_t scancode = inb(0x60);
-
-    if(!(scancode & 0x80)) {
-        term.print("KBD Scnacode: ");
-        term.print_hex(scancode);
-        term.print("\n");
+    if (!(scancode & 0x80)) { // Key down
+        char c = kbd_us[scancode];
+        if (c > 0) {
+            uint32_t next = (kbd_head + 1) % 256;
+            if (next != kbd_tail) {
+                kbd_buffer[kbd_head] = c;
+                kbd_head = next;
+            }
+        }
     }
-
-    outb(0x20, 0x20);
+    PIC::send_eoi(1);
 }
+
+// --- Системные функции ---
 
 void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags) {
-    uint64_t addr = (uint64_t)isr; // Берем чистый 64-битный адрес
-    term.print_hex(addr); 
-
+    uint64_t addr = (uint64_t)isr;
     idt[vector].isr_low    = (uint16_t)(addr & 0xFFFF);
     idt[vector].kernel_cs  = 0x18;
     idt[vector].ist        = 0;
@@ -52,57 +60,30 @@ void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags) {
     idt[vector].reserved   = 0;
 }
 
-// Эту функцию мы вызовем в _kmain
+char kbd_pop() {
+    if (kbd_head == kbd_tail) return 0;
+    char c = kbd_buffer[kbd_tail];
+    kbd_tail = (kbd_tail + 1) % 256;
+    return c;
+}
+
 void idt_init() {
-    // Явно обнулим всю таблицу перед заполнением, чтобы IST был точно 0
-    for(int i = 0; i < 256; i++) {
-        idt_set_descriptor(i, (void*)isr0, 0x8E); // Забьем всё заглушкой
-    }
-    
-    // А теперь ставим нужный нам breakpoint
-    idt_set_descriptor(32, (void*)isr32, 0x8E);
-    idt_set_descriptor(33, (void*)isr33, 0x8E);
+    // 1. Инициализация PIC через твою новую библиотеку
+    PIC::init(0x20, 0x28);
 
+    // 2. Регистрация векторов
+    for(int i = 0; i < 256; i++) idt_set_descriptor(i, 0, 0);
+
+    idt_set_descriptor(0,  (void*)isr0,  0x8E); // Exceptions
+    idt_set_descriptor(32, (void*)irq32, 0x8E); // Timer
+    idt_set_descriptor(33, (void*)irq33, 0x8E); // Keyboard
+
+    // 3. Загрузка IDTR
     idtr.base = (uint64_t)&idt;
-    idtr.limit = (uint16_t)sizeof(idt_entry_t) * 256 - 1;
-
+    idtr.limit = sizeof(idt) - 1;
     __asm__ volatile("lidt %0" : : "m"(idtr));
-}
 
-void timer_init(uint8_t hz) {
-    uint32_t divisor = 1193182 / hz;
-    outb(0x43, 0x36);
-    outb(0x40, (uint8_t)(divisor & 0xFF));
-    outb(0x40, (uint8_t)(divisor >> 8) & 0xFF);
-}
-
-extern "C" void exception_handler(interrupt_frame* frame) {
-    if (frame->interrupt_number == 32 || frame->interrupt_number == 0x20) {
-        outb(0x20, 0x20); // Отправляем EOI Master PIC
-        return; // ПРОСТО ВЫХОДИМ, чтобы ядро работало дальше
-    }
-
-    // 2. Обработка клавиатуры
-    if (frame->interrupt_number == 33 || frame->interrupt_number == 0x21) {
-        uint8_t scancode = inb(0x60);
-        term.print("KBD: ");
-        term.print_hex(scancode);
-        term.print("\n");
-        
-        outb(0x20, 0x20); // EOI
-        return;
-    }
-
-    term.set_color(WHITE, RED);
-    term.clear();
-    term.print("!!!! KERNEL PANIC !!!!\n");
-
-    term.print("Exception: ");
-    term.print_hex(frame->interrupt_number);
-    term.print("\nError Code: ");
-    term.print_hex(frame->error_code);
-    term.print("\nRIP: ");
-    term.print_hex(frame->rip);
-    
-    while(1) { __asm__ volatile("hlt"); }
+    // 4. Разрешаем линии
+    PIC::unmask(0);
+    PIC::unmask(1);
 }
