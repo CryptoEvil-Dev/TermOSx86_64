@@ -1,5 +1,6 @@
 #pragma once
 #include "stdio.hpp"
+#include "vfs.hpp"
 #include "idt.hpp"
 
 namespace std {
@@ -43,5 +44,8 @@ namespace std {
 
     extern ostream cout;
     extern istream cin;
+    extern ostream cerr;
     const char endl = '\n';
+
+    void write_to_stream(ostream* s, const char* str);
 }

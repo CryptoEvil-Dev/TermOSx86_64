@@ -2,6 +2,7 @@
 #include "../include/pic.hpp"
 #include "../include/io.hpp"
 #include "stdio.hpp"
+#include "iostream.hpp"
 
 // Выделение памяти
 idt_entry_t idt[256];
@@ -20,12 +21,6 @@ static const char kbd_us[128] = {
 };
 
 // --- Обработчики (ISR/IRQ) ---
-
-extern "C" void isr0_handler(interrupt_frame* frame) {
-    term.set_color(WHITE, RED);
-    term.print("\nCPU EXCEPTION: DIVIDE BY ZERO\n");
-    while(1) { __asm__ volatile("hlt"); }
-}
 
 extern "C" void irq0_handler(interrupt_frame* frame) {
     ticks++;
@@ -67,23 +62,33 @@ char kbd_pop() {
     return c;
 }
 
-void idt_init() {
-    // 1. Инициализация PIC через твою новую библиотеку
-    PIC::init(0x20, 0x28);
 
-    // 2. Регистрация векторов
-    for(int i = 0; i < 256; i++) idt_set_descriptor(i, 0, 0);
+namespace Interrupts {
+    void init() {
+        PIC::init(0x20, 0x28);
 
-    idt_set_descriptor(0,  (void*)isr0,  0x8E); // Exceptions
-    idt_set_descriptor(32, (void*)irq32, 0x8E); // Timer
-    idt_set_descriptor(33, (void*)irq33, 0x8E); // Keyboard
+        // Паникуем по умолчанию
+        for(int i = 0; i < 256; i++) {
+            idt_set_descriptor(i, (void*)isr0, 0x8E);
+        }
 
-    // 3. Загрузка IDTR
-    idtr.base = (uint64_t)&idt;
-    idtr.limit = sizeof(idt) - 1;
-    __asm__ volatile("lidt %0" : : "m"(idtr));
+        // Регистрируем конкретные IRQ
+        idt_set_descriptor(32, (void*)irq32, 0x8E);
+        idt_set_descriptor(33, (void*)irq33, 0x8E);
 
-    // 4. Разрешаем линии
-    PIC::unmask(0);
-    PIC::unmask(1);
+        idtr.base = (uint64_t)&idt;
+        idtr.limit = sizeof(idt) - 1;
+        __asm__ volatile("lidt %0" : : "m"(idtr));
+
+        PIC::unmask(0);
+        PIC::unmask(1);
+    }
+}
+
+// Паникуем исключительно в std::err
+extern "C" void isr0_handler(interrupt_frame* frame) {
+    std::cerr << "\n--- KERNEL PANIC ---" << std::endl;
+    std::cerr << "Exception: " << std::dec << (int)frame->rip << " (Divide by Zero)" << std::endl;
+    std::cerr << "RSP: " << std::hex << (void*)frame->rsp << std::endl;
+    while(1) __asm__ volatile("hlt");
 }

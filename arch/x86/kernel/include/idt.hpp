@@ -25,9 +25,16 @@ extern "C" {
 extern uint64_t ticks;
 
 // Интерфейс IDT
-void idt_init();
 void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags);
 
 // Интерфейс клавиатуры (для iostream)
 void kbd_init();
 char kbd_pop(); 
+
+namespace Interrupts {
+    void init();
+
+    void register_handler(uint8_t vector, void (*handler)());
+
+    extern "C" void panic_handler(interrupt_frame* frame);
+}

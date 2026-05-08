@@ -18,12 +18,16 @@ public:
     void clear();
     void set_color(vga_color fg, vga_color bg);
 
+    vga_color get_bg();
+    vga_color get_fg();
+
 private:
     void scroll();
     void update_cursor();
 
     uint16_t* vidmem;
     int x, y;
+    vga_color fg, bg;
     uint8_t current_color;
 };
 

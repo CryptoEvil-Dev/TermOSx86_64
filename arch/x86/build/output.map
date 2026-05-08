@@ -3,6 +3,12 @@
 
  .group         0x0000000000000000        0x8 build/kernel.o
  .group         0x0000000000000000        0xc build/kernel.o
+ .group         0x0000000000000000        0x8 build/src/idt.o
+ .group         0x0000000000000000        0xc build/src/idt.o
+ .text._ZNSt7ostreamlsESt3fmt
+                0x0000000000000000       0x22 build/src/idt.o
+ .text._ZNSt7ostreamlsEPv
+                0x0000000000000000       0x50 build/src/idt.o
 
 Настройки памяти
 
@@ -25,126 +31,172 @@
                 0x0000000000007ca3                gets
                 0x0000000000007e00                . = 0x7e00
 
-.text           0x0000000000007e00     0x1298
+.text           0x0000000000007e00     0x19e8
  build/boot.o(.text)
  .text          0x0000000000007e00       0xb3 build/boot.o
  *(.text*)
- .text          0x0000000000007eb3      0x223 build/kernel.o
+ .text          0x0000000000007eb3      0x2c4 build/kernel.o
                 0x0000000000007eb3                _kmain
+ *fill*         0x0000000000008177        0x1 
  .text._ZNSt7ostreamlsESt3fmt
-                0x00000000000080d6       0x22 build/kernel.o
-                0x00000000000080d6                std::ostream::operator<<(std::fmt)
+                0x0000000000008178       0x22 build/kernel.o
+                0x0000000000008178                std::ostream::operator<<(std::fmt)
  .text._ZNSt7ostreamlsEPv
-                0x00000000000080f8       0x50 build/kernel.o
-                0x00000000000080f8                std::ostream::operator<<(void*)
- .text          0x0000000000008148      0x2ee build/src/pic.o
-                0x000000000000818d                PIC::init(unsigned char, unsigned char)
-                0x0000000000008284                PIC::send_eoi(unsigned char)
-                0x00000000000082ca                PIC::unmask(unsigned char)
-                0x0000000000008339                PIC::remap()
- .text          0x0000000000008436      0x363 build/src/iostream.o
-                0x0000000000008436                std::ostream::print_uint(unsigned long, unsigned char)
-                0x0000000000008516                std::ostream::operator<<(char const*)
-                0x0000000000008550                std::ostream::operator<<(char)
-                0x000000000000858a                std::ostream::operator<<(unsigned long)
-                0x000000000000861c                std::ostream::operator<<(int)
-                0x0000000000008674                std::istream::operator>>(char&)
-                0x00000000000086b2                std::istream::operator>>(char*)
- .text          0x0000000000008799      0x419 build/src/idt.o
-                0x00000000000087bb                isr0_handler
-                0x0000000000008817                irq0_handler
-                0x0000000000008859                irq1_handler
-                0x000000000000890c                idt_set_descriptor(unsigned char, void*, unsigned char)
-                0x0000000000008a28                kbd_pop()
-                0x0000000000008a9a                idt_init()
- .text          0x0000000000008bb2      0x434 build/src/stdio.o
-                0x0000000000008bb2                Terminal::Terminal()
-                0x0000000000008bb2                Terminal::Terminal()
-                0x0000000000008c16                Terminal::set_color(vga_color, vga_color)
-                0x0000000000008c46                Terminal::clear()
-                0x0000000000008cb0                Terminal::put_char(char)
-                0x0000000000008d9e                Terminal::scroll()
-                0x0000000000008e3a                Terminal::print(char const*)
-                0x0000000000008e9c                Terminal::update_cursor()
-                0x0000000000008eb0                Terminal::print_hex(unsigned long)
-                0x0000000000008f48                Terminal::init()
- *fill*         0x0000000000008fe6        0xa 
- .text          0x0000000000008ff0       0xa8 build/src/interrupts.o
-                0x0000000000008ff0                isr0
-                0x0000000000009028                irq32
-                0x0000000000009060                irq33
+                0x000000000000819a       0x50 build/kernel.o
+                0x000000000000819a                std::ostream::operator<<(void*)
+ .text          0x00000000000081ea      0x2ee build/src/pic.o
+                0x000000000000822f                PIC::init(unsigned char, unsigned char)
+                0x0000000000008326                PIC::send_eoi(unsigned char)
+                0x000000000000836c                PIC::unmask(unsigned char)
+                0x00000000000083db                PIC::remap()
+ .text          0x00000000000084d8      0x32d build/src/pmm.o
+                0x00000000000084d8                Memory::set_bit(unsigned long)
+                0x0000000000008532                Memory::clear_bit(unsigned long)
+                0x000000000000858e                Memory::get_bit(unsigned long)
+                0x00000000000085d3                Memory::pmm_init(unsigned long)
+                0x000000000000865e                Memory::pmm_lock_pages(void*, unsigned long)
+                0x00000000000086f7                Memory::alloc_page()
+                0x0000000000008784                Memory::free_page(void*)
+                0x00000000000087ee                Memory::get_free_memory()
+ .text          0x0000000000008805      0x16d build/src/vfs.o
+                0x0000000000008805                std::vga_write(char const*)
+                0x0000000000008838                std::vga_write_err(char const*)
+                0x00000000000088b1                std::kbd_read()
+                0x00000000000088c7                std::get_stdout_obj()
+                0x00000000000088db                std::get_stdin_obj()
+                0x00000000000088ef                std::get_stderr_obj()
+                0x0000000000008903                std::vfs_init()
+ .text          0x0000000000008972      0x40d build/src/iostream.o
+                0x0000000000008972                std::write_to_stream(std::ostream*, char const*)
+                0x00000000000089dc                std::ostream::print_uint(unsigned long, unsigned char)
+                0x0000000000008ab0                std::ostream::operator<<(char const*)
+                0x0000000000008ae4                std::ostream::operator<<(char)
+                0x0000000000008b26                std::ostream::operator<<(unsigned long)
+                0x0000000000008bd8                std::ostream::operator<<(int)
+                0x0000000000008c2a                std::istream::operator>>(char&)
+                0x0000000000008c98                std::istream::operator>>(char*)
+ .text          0x0000000000008d7f      0x4e6 build/src/idt.o
+                0x0000000000008da1                irq0_handler
+                0x0000000000008de3                irq1_handler
+                0x0000000000008e96                idt_set_descriptor(unsigned char, void*, unsigned char)
+                0x0000000000008fb2                kbd_pop()
+                0x0000000000009024                Interrupts::init()
+                0x0000000000009121                isr0_handler
+ *fill*         0x0000000000009265        0x1 
+ .text          0x0000000000009266      0x4d1 build/src/stdio.o
+                0x0000000000009266                Terminal::Terminal()
+                0x0000000000009266                Terminal::Terminal()
+                0x00000000000092ca                Terminal::set_color(vga_color, vga_color)
+                0x00000000000092fa                Terminal::clear()
+                0x0000000000009364                Terminal::put_char(char)
+                0x00000000000094bc                Terminal::scroll()
+                0x0000000000009558                Terminal::print(char const*)
+                0x00000000000095ba                Terminal::update_cursor()
+                0x00000000000095ce                Terminal::print_hex(unsigned long)
+                0x0000000000009666                Terminal::init()
+                0x00000000000096ca                Terminal::get_fg()
+                0x00000000000096e4                Terminal::get_bg()
+ *fill*         0x0000000000009737        0x9 
+ .text          0x0000000000009740       0xa8 build/src/interrupts.o
+                0x0000000000009740                isr0
+                0x0000000000009778                irq32
+                0x00000000000097b0                irq33
 
-.rodata         0x00000000000090a0      0x154
+.rodata         0x0000000000009800      0x1ce
  *(.rodata*)
- .rodata        0x00000000000090a0       0x66 build/kernel.o
- .rodata        0x0000000000009106        0x5 build/src/pic.o
- .rodata        0x000000000000910b       0x12 build/src/iostream.o
- *fill*         0x000000000000911d        0x3 
- .rodata        0x0000000000009120       0xc0 build/src/idt.o
- .rodata        0x00000000000091e0       0x14 build/src/stdio.o
+ .rodata        0x0000000000009800       0x95 build/kernel.o
+ .rodata        0x0000000000009895        0x5 build/src/pic.o
+ *fill*         0x000000000000989a        0x6 
+ .rodata        0x00000000000098a0        0x9 build/src/pmm.o
+ .rodata        0x00000000000098a9       0x14 build/src/vfs.o
+ .rodata        0x00000000000098bd       0x15 build/src/iostream.o
+ *fill*         0x00000000000098d2        0xe 
+ .rodata        0x00000000000098e0       0xda build/src/idt.o
+ .rodata        0x00000000000099ba       0x14 build/src/stdio.o
 
-.eh_frame       0x00000000000091f8      0x4b8
- .eh_frame      0x00000000000091f8       0x78 build/kernel.o
- .eh_frame      0x0000000000009270       0xd8 build/src/pic.o
- .eh_frame      0x0000000000009348       0xf8 build/src/iostream.o
- .eh_frame      0x0000000000009440       0xf8 build/src/idt.o
- .eh_frame      0x0000000000009538      0x178 build/src/stdio.o
+.eh_frame       0x00000000000099d0      0x768
+ .eh_frame      0x00000000000099d0       0x78 build/kernel.o
+ .eh_frame      0x0000000000009a48       0xd8 build/src/pic.o
+ .eh_frame      0x0000000000009b20      0x118 build/src/pmm.o
+ .eh_frame      0x0000000000009c38       0xf8 build/src/vfs.o
+ .eh_frame      0x0000000000009d30      0x118 build/src/iostream.o
+ .eh_frame      0x0000000000009e48      0x138 build/src/idt.o
+ .eh_frame      0x0000000000009f80      0x1b8 build/src/stdio.o
 
 .note.gnu.property
-                0x00000000000096b0       0xa0
+                0x000000000000a138       0xe0
  .note.gnu.property
-                0x00000000000096b0       0x20 build/kernel.o
+                0x000000000000a138       0x20 build/kernel.o
  .note.gnu.property
-                0x00000000000096d0       0x20 build/src/pic.o
+                0x000000000000a158       0x20 build/src/pic.o
  .note.gnu.property
-                0x00000000000096f0       0x20 build/src/iostream.o
+                0x000000000000a178       0x20 build/src/pmm.o
  .note.gnu.property
-                0x0000000000009710       0x20 build/src/idt.o
+                0x000000000000a198       0x20 build/src/vfs.o
  .note.gnu.property
-                0x0000000000009730       0x20 build/src/stdio.o
+                0x000000000000a1b8       0x20 build/src/iostream.o
+ .note.gnu.property
+                0x000000000000a1d8       0x20 build/src/idt.o
+ .note.gnu.property
+                0x000000000000a1f8       0x20 build/src/stdio.o
 
-.data           0x0000000000009750        0x0
+.data           0x000000000000a220       0x58
  *(.data*)
- .data          0x0000000000009750        0x0 build/kernel.o
- .data          0x0000000000009750        0x0 build/src/pic.o
- .data          0x0000000000009750        0x0 build/src/iostream.o
- .data          0x0000000000009750        0x0 build/src/idt.o
- .data          0x0000000000009750        0x0 build/src/stdio.o
+ .data          0x000000000000a220        0x0 build/kernel.o
+ .data          0x000000000000a220        0x0 build/src/pic.o
+ .data          0x000000000000a220        0x0 build/src/pmm.o
+ .data          0x000000000000a220       0x58 build/src/vfs.o
+ .data          0x000000000000a278        0x0 build/src/iostream.o
+ .data          0x000000000000a278        0x0 build/src/idt.o
+ .data          0x000000000000a278        0x0 build/src/stdio.o
 
-.init_array     0x0000000000009750        0x8
- .init_array    0x0000000000009750        0x8 build/src/stdio.o
+.init_array     0x000000000000a278        0x8
+ .init_array    0x000000000000a278        0x8 build/src/stdio.o
 
-.bss            0x0000000000009760     0x1168
+.bss            0x000000000000a280     0x11a0
  *(COMMON)
  *(.bss*)
- .bss           0x0000000000009760        0x0 build/kernel.o
- .bss           0x0000000000009760        0x0 build/src/pic.o
- .bss           0x0000000000009760        0x5 build/src/iostream.o
-                0x0000000000009760                std::cout
-                0x0000000000009764                std::cin
- *fill*         0x0000000000009765       0x1b 
- .bss           0x0000000000009780     0x1128 build/src/idt.o
-                0x0000000000009780                idt
-                0x000000000000a780                idtr
-                0x000000000000a790                ticks
- *fill*         0x000000000000a8a8        0x8 
- .bss           0x000000000000a8b0       0x18 build/src/stdio.o
-                0x000000000000a8b0                term
+ .bss           0x000000000000a280        0x0 build/kernel.o
+ .bss           0x000000000000a280        0x0 build/src/pic.o
+ .bss           0x000000000000a280       0x18 build/src/pmm.o
+                0x000000000000a280                Memory::bitmap
+                0x000000000000a288                Memory::max_pages
+                0x000000000000a290                Memory::free_memory
+ .bss           0x000000000000a298       0x18 build/src/vfs.o
+                0x000000000000a298                std::stdout
+                0x000000000000a2a0                std::stdin
+                0x000000000000a2a8                std::stderr
+ .bss           0x000000000000a2b0        0x9 build/src/iostream.o
+                0x000000000000a2b0                std::cout
+                0x000000000000a2b4                std::cerr
+                0x000000000000a2b8                std::cin
+ *fill*         0x000000000000a2b9        0x7 
+ .bss           0x000000000000a2c0     0x1128 build/src/idt.o
+                0x000000000000a2c0                idt
+                0x000000000000b2c0                idtr
+                0x000000000000b2d0                ticks
+ *fill*         0x000000000000b3e8       0x18 
+ .bss           0x000000000000b400       0x20 build/src/stdio.o
+                0x000000000000b400                term
 LOAD build/boot.o
 LOAD build/kernel.o
 LOAD build/src/pic.o
+LOAD build/src/pmm.o
+LOAD build/src/vfs.o
 LOAD build/src/iostream.o
 LOAD build/src/idt.o
 LOAD build/src/stdio.o
 LOAD build/src/interrupts.o
 OUTPUT(build/TermOS.bin binary)
 
-.comment        0x0000000000000000       0xe6
+.comment        0x0000000000000000      0x142
  .comment       0x0000000000000000       0x2e build/kernel.o
  .comment       0x000000000000002e       0x2e build/src/pic.o
- .comment       0x000000000000005c       0x2e build/src/iostream.o
- .comment       0x000000000000008a       0x2e build/src/idt.o
- .comment       0x00000000000000b8       0x2e build/src/stdio.o
+ .comment       0x000000000000005c       0x2e build/src/pmm.o
+ .comment       0x000000000000008a       0x2e build/src/vfs.o
+ .comment       0x00000000000000b8       0x2e build/src/iostream.o
+ .comment       0x00000000000000e6       0x2e build/src/idt.o
+ .comment       0x0000000000000114       0x2e build/src/stdio.o
 
 .note.GNU-stack
                 0x0000000000000000        0x0
@@ -152,6 +204,10 @@ OUTPUT(build/TermOS.bin binary)
                 0x0000000000000000        0x0 build/kernel.o
  .note.GNU-stack
                 0x0000000000000000        0x0 build/src/pic.o
+ .note.GNU-stack
+                0x0000000000000000        0x0 build/src/pmm.o
+ .note.GNU-stack
+                0x0000000000000000        0x0 build/src/vfs.o
  .note.GNU-stack
                 0x0000000000000000        0x0 build/src/iostream.o
  .note.GNU-stack

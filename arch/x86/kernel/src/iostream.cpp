@@ -2,14 +2,24 @@
 
 namespace std {
     ostream cout;
+    ostream cerr;
     istream cin;
 
     // --- Вывод (ostream) ---
 
+
+    void write_to_stream(ostream* s, const char* str) {
+    FILE* target = (s == &cerr) ? stderr : stdout;
+    if (target && target->write) {
+        target->write(str);
+    }
+}
+
+
     void ostream::print_uint(uint64_t n, uint8_t base) {
-        if (n == 0) { term.put_char('0'); return; }
+        if (n == 0) { *this << '0'; return; }
         
-        char buf[64];
+        char buf[65]; // 64 бита в двоичной системе + null
         int i = 0;
         const char* chars = "0123456789ABCDEF";
 
@@ -17,28 +27,36 @@ namespace std {
             buf[i++] = chars[n % base];
             n /= base;
         }
-        while (--i >= 0) term.put_char(buf[i]);
+        
+        // Переворачиваем и выводим через перегрузку char
+        while (--i >= 0) {
+            *this << buf[i];
+        }
     }
 
     ostream& ostream::operator<<(const char* str) {
-        term.print(str);
+        write_to_stream(this, str);
         return *this;
     }
 
     ostream& ostream::operator<<(char c) {
-        term.put_char(c);
+        char buf[2] = {c, 0};
+        write_to_stream(this, buf);
         return *this;
     }
 
     ostream& ostream::operator<<(uint64_t n) {
-        if (current_fmt == hex) term.print_hex(n);
+        if (current_fmt == hex) {
+            *this << "0x";
+            print_uint(n, 16);
+        }
         else if (current_fmt == bin) print_uint(n, 2);
         else print_uint(n, 10);
         return *this;
     }
 
     ostream& ostream::operator<<(int n) {
-        if (n < 0) { term.put_char('-'); n = -n; }
+        if (n < 0) { *this << '-'; n = -n; }
         return *this << (uint64_t)n;
     }
 
@@ -46,12 +64,14 @@ namespace std {
 
     istream& istream::operator>>(char& c) {
         while (true) {
-            char ch = kbd_pop();
-            if (ch != 0) {
-                c = ch;
-                return *this;
+            if (stdin && stdin->read) {
+                char ch = stdin->read();
+                if(ch != 0) {
+                    c = ch;
+                    return *this;
+                }
+                __asm__ volatile("hlt");
             }
-            __asm__ volatile("hlt");
         }
     }
 
@@ -59,19 +79,20 @@ namespace std {
         int i = 0;
         while (true) {
             char c;
-            *this >> c; // Используем перегрузку для char
+            *this >> c;
 
             if (c == '\n') {
-                term.put_char('\n');
+                // *this >> c; // Это просто "эхо" в stdout через оператор ниже
+                cout << '\n';
                 buffer[i] = '\0';
                 break;
             } else if (c == '\b') {
                 if (i > 0) {
                     i--;
-                    term.put_char('\b'); // Нужно будет научить терминал стирать символ
+                    cout << '\b';
                 }
             } else {
-                term.put_char(c);
+                cout << c;
                 buffer[i++] = c;
             }
         }

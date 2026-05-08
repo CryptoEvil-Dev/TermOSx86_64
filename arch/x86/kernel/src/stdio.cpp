@@ -6,12 +6,15 @@ Terminal::Terminal() {
     vidmem = (uint16_t*)0xb8000;
     x = 0;
     y = 0;
+
     set_color(WHITE, BLACK);
     clear();
 }
 
 void Terminal::set_color(vga_color fg, vga_color bg) {
     current_color = fg | (bg << 4);
+    fg = fg;
+    bg = bg;
 }
 
 void Terminal::clear() {
@@ -23,18 +26,17 @@ void Terminal::clear() {
 }
 
 void Terminal::put_char(char c) {
-    if (c == '\n') {
+    if(c == '\n') {
         x = 0;
         y++;
+    } else if(c == '\b') {
+        if(x > 0) x--;
+        else if(y > 0) { y--; x = 79; }
+        vidmem[y * 80 + x] = (uint16_t)' ' | (uint16_t)current_color << 8;
+        return;
     } else {
-        const int index = y * 80 + x;
-        vidmem[index] = (uint16_t)c | (uint16_t)current_color << 8;
+        vidmem[y * 80 + x] = (uint16_t)c | (uint16_t)current_color << 8;
         x++;
-    }
-
-    if (x >= 80) {
-        x = 0;
-        y++;
     }
 
     if (y >= 25) {
@@ -77,4 +79,12 @@ void Terminal::init() {
     x = 0; y = 0;
     set_color(WHITE, BLACK);
     clear();
+}
+
+vga_color Terminal::get_fg() {
+    return fg;
+}
+
+vga_color Terminal::get_bg() {
+    return bg;
 }
