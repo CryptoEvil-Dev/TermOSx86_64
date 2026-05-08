@@ -1,0 +1,143 @@
+
+There are no discarded input sections
+
+Настройки памяти
+
+Имя           Происхождение Длина         Атрибуты
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Сценарий компоновщика и карта памяти
+
+                0x0000000000007c00                . = 0x7c00
+
+.boot           0x0000000000007c00      0x200
+ build/boot.o(.boot)
+ .boot          0x0000000000007c00      0x200 build/boot.o
+                0x0000000000007c00                _start
+                0x0000000000007c63                next_line
+                0x0000000000007c70                clear
+                0x0000000000007c79                printc
+                0x0000000000007c82                prints
+                0x0000000000007c94                getc
+                0x0000000000007ca3                gets
+                0x0000000000007e00                . = 0x7e00
+
+.text           0x0000000000007e00      0xc99
+ build/boot.o(.text)
+ .text          0x0000000000007e00       0xb3 build/boot.o
+ *(.text*)
+ .text          0x0000000000007eb3      0x1fe build/kernel.o
+                0x0000000000007ef8                pic_remap()
+                0x0000000000007ff5                _kmain
+ .text          0x00000000000080b1      0x4b0 build/src/idt.o
+                0x00000000000080f6                idt_set_descriptor(unsigned char, void*, unsigned char)
+                0x0000000000008232                idt_init()
+                0x000000000000831a                exception_handler
+ *fill*         0x0000000000008561        0x1 
+ .text          0x0000000000008562      0x434 build/src/stdio.o
+                0x0000000000008562                Terminal::Terminal()
+                0x0000000000008562                Terminal::Terminal()
+                0x00000000000085c6                Terminal::set_color(vga_color, vga_color)
+                0x00000000000085f6                Terminal::clear()
+                0x0000000000008660                Terminal::put_char(char)
+                0x000000000000874e                Terminal::scroll()
+                0x00000000000087ea                Terminal::print(char const*)
+                0x000000000000884c                Terminal::update_cursor()
+                0x0000000000008860                Terminal::print_hex(unsigned long)
+                0x00000000000088f8                Terminal::init()
+ *fill*         0x0000000000008996        0xa 
+ .text          0x00000000000089a0       0xf9 build/src/interrupts.o
+                0x00000000000089a0                isr0
+                0x00000000000089a9                isr1
+                0x00000000000089b2                isr2
+                0x00000000000089bb                isr3
+                0x00000000000089c4                isr4
+                0x00000000000089cd                isr5
+                0x00000000000089d6                isr6
+                0x00000000000089df                isr7
+                0x00000000000089e8                isr8
+                0x00000000000089ef                isr9
+                0x00000000000089f5                isr10
+                0x00000000000089f9                isr11
+                0x00000000000089fd                isr12
+                0x0000000000008a01                isr13
+                0x0000000000008a05                isr14
+                0x0000000000008a09                isr15
+                0x0000000000008a0f                isr16
+                0x0000000000008a15                isr17
+                0x0000000000008a19                isr18
+                0x0000000000008a1f                isr19
+                0x0000000000008a25                isr20
+                0x0000000000008a2b                isr21
+                0x0000000000008a2f                isr22
+                0x0000000000008a35                isr23
+                0x0000000000008a3b                isr24
+                0x0000000000008a41                isr25
+                0x0000000000008a47                isr26
+                0x0000000000008a4d                isr27
+                0x0000000000008a53                isr28
+                0x0000000000008a59                isr29
+                0x0000000000008a5d                isr30
+                0x0000000000008a61                isr31
+                0x0000000000008a67                isr32
+                0x0000000000008a6d                isr33
+
+.rodata         0x0000000000008aa0       0x9c
+ *(.rodata*)
+ .rodata        0x0000000000008aa0       0x47 build/kernel.o
+ .rodata        0x0000000000008ae7       0x41 build/src/idt.o
+ .rodata        0x0000000000008b28       0x14 build/src/stdio.o
+
+.eh_frame       0x0000000000008b40      0x2c8
+ .eh_frame      0x0000000000008b40       0x98 build/kernel.o
+ .eh_frame      0x0000000000008bd8       0xb8 build/src/idt.o
+ .eh_frame      0x0000000000008c90      0x178 build/src/stdio.o
+
+.note.gnu.property
+                0x0000000000008e08       0x60
+ .note.gnu.property
+                0x0000000000008e08       0x20 build/kernel.o
+ .note.gnu.property
+                0x0000000000008e28       0x20 build/src/idt.o
+ .note.gnu.property
+                0x0000000000008e48       0x20 build/src/stdio.o
+
+.data           0x0000000000008e80     0x1000
+ *(.data*)
+ .data          0x0000000000008e80        0x0 build/kernel.o
+ .data          0x0000000000008e80     0x1000 build/src/idt.o
+                0x0000000000008e80                idt
+ .data          0x0000000000009e80        0x0 build/src/stdio.o
+
+.init_array     0x0000000000009e80        0x8
+ .init_array    0x0000000000009e80        0x8 build/src/stdio.o
+
+.bss            0x0000000000009e90       0x28
+ *(COMMON)
+ *(.bss*)
+ .bss           0x0000000000009e90        0x0 build/kernel.o
+ .bss           0x0000000000009e90        0xa build/src/idt.o
+                0x0000000000009e90                idtr
+ *fill*         0x0000000000009e9a        0x6 
+ .bss           0x0000000000009ea0       0x18 build/src/stdio.o
+                0x0000000000009ea0                term
+LOAD build/boot.o
+LOAD build/kernel.o
+LOAD build/src/idt.o
+LOAD build/src/stdio.o
+LOAD build/src/interrupts.o
+OUTPUT(build/TermOS.bin binary)
+
+.comment        0x0000000000000000       0x8a
+ .comment       0x0000000000000000       0x2e build/kernel.o
+ .comment       0x000000000000002e       0x2e build/src/idt.o
+ .comment       0x000000000000005c       0x2e build/src/stdio.o
+
+.note.GNU-stack
+                0x0000000000000000        0x0
+ .note.GNU-stack
+                0x0000000000000000        0x0 build/kernel.o
+ .note.GNU-stack
+                0x0000000000000000        0x0 build/src/idt.o
+ .note.GNU-stack
+                0x0000000000000000        0x0 build/src/stdio.o
