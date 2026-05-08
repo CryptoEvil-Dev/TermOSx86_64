@@ -4,6 +4,7 @@
 #include "include/pic.hpp"
 #include "include/io.hpp"
 #include "include/pmm.hpp"
+#include "include/ata.hpp"
 
 extern "C" void _kmain() {
     std::vfs_init();
@@ -17,6 +18,8 @@ extern "C" void _kmain() {
 
     std::cout << "TermOS 64-bit Kernel Started!" << std::endl;
     std::cout << "PMM INitialized. Free memory: " << std::dec << Memory::get_free_memory() / 1024 / 1024 << " MB" << std::endl;
+
+    Storage::disk_mgr.init();
 
     // Чистим мусор в контроллере клавиатуры
     // while(inb(0x64) & 1) inb(0x60);

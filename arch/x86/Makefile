@@ -38,7 +38,8 @@ $(BOOT_OBJ): boot/boot.asm
 	$(AS) $(ASFLAGS) boot/boot.asm -o $(BOOT_OBJ)
 
 run:
-	qemu-system-x86_64 -drive format=raw,file=$(BIN)
+	qemu-img create -f raw build/disk.img 256M
+	qemu-system-x86_64 -drive format=raw,file=$(BIN) -drive file=build/disk.img,format=raw,if=ide
 
 clean:
 	rm -rf build/*
