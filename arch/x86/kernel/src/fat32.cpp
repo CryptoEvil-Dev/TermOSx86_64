@@ -62,7 +62,7 @@ namespace Storage {
 
         fat32_dir_entry_t* entry = (fat32_dir_entry_t*)buffer;
 
-        std::cout << "Directory listing for cluster " << current_dir_cluster << ":" << std::endl;
+        // std::cout << "Directory listing for cluster " << current_dir_cluster << ":" << std::endl; // DEBUG
         for (int i = 0; i < 16; i++) {
             if (entry[i].name[0] == 0x00) break;
             if ((uint8_t)entry[i].name[0] == 0xE5) continue;
@@ -87,7 +87,7 @@ namespace Storage {
             uint8_t first_byte = (uint8_t)entries[i].name[0];
 
             if (first_byte != 0 && first_byte != 0xE5) {
-                std::cout << "Slot " << i << " is valid. Comparing..." << std::endl;
+                // std::cout << "Slot " << i << " is valid. Comparing..." << std::endl;
                 if (fat_name_match(name, entries[i].name)) {
                     *out_entry = entries[i];
                     return true;
@@ -205,7 +205,7 @@ namespace Storage {
                     std::cerr << "Error writing parent directory!" << std::endl;
                     return;
                 }
-                std::cout << "Directory created: " << name << " (cluster " << new_cluster << ")" << std::endl;
+                // std::cout << "Directory created: " << name << " (cluster " << new_cluster << ")" << std::endl; // DEBUG
                 return;
             }
         }
@@ -218,8 +218,9 @@ namespace Storage {
         char old_path[256];
         std::strcpy(old_path, current_path);
 
+        // Если путь абсолютный – начинаем с корня
         if (path[0] == '/') {
-            current_dir_cluster = 2;   // корень
+            current_dir_cluster = 2;
             current_path[0] = '/';
             current_path[1] = '\0';
             if (path[1] == '\0') return;
@@ -228,9 +229,11 @@ namespace Storage {
 
         char component[256];
         while (*path != '\0') {
+            // Пропускаем слеши в начале/между компонентами
             while (*path == '/') path++;
             if (*path == '\0') break;
 
+            // Копируем очередной компонент
             int i = 0;
             while (path[i] != '\0' && path[i] != '/') {
                 component[i] = path[i];
@@ -239,6 +242,7 @@ namespace Storage {
             component[i] = '\0';
             path += i;
 
+            // Обработка ".."
             if (std::strcmp(component, "..") == 0) {
                 uint32_t parent = fat32_get_parent_cluster();
                 if (parent != 0) {
@@ -249,7 +253,7 @@ namespace Storage {
                         while (last_slash >= 0 && current_path[last_slash] != '/')
                             last_slash--;
                         if (last_slash == 0)
-                            current_path[1] = '\0';
+                            current_path[1] = '\0';   // остаёмся в корне
                         else
                             current_path[last_slash] = '\0';
                     }
@@ -257,12 +261,15 @@ namespace Storage {
                 continue;
             }
 
+            // "." – остаёмся на месте
             if (std::strcmp(component, ".") == 0) {
                 continue;
             }
 
+            // Поиск компонента в текущем каталоге
             fat32_dir_entry_t entry;
             if (!fat32_find_file(component, &entry)) {
+                // Откат при ошибке
                 current_dir_cluster = old_cluster;
                 std::strcpy(current_path, old_path);
                 std::cerr << "Directory not found: " << component << std::endl;
@@ -276,14 +283,18 @@ namespace Storage {
                 return;
             }
 
+            // Переходим в найденный каталог
             uint32_t new_cluster = ((uint32_t)entry.cluster_high << 16) | entry.cluster_low;
             current_dir_cluster = new_cluster;
 
+            // Дописываем компонент к текущему пути
             if (current_path[std::strlen(current_path) - 1] != '/')
                 std::strcat(current_path, "/");
             std::strcat(current_path, component);
         }
     }
+
+
 
     void fat32_rm(const char* filename) {
         uint8_t buffer[512];
@@ -295,7 +306,7 @@ namespace Storage {
             if (fat_name_match(filename, entries[i].name)) {
                 entries[i].name[0] = 0xE5;
                 disk_mgr.write_sector(1, sector, buffer);
-                std::cout << "Removed: " << filename << std::endl;
+                // std::cout << "Removed: " << filename << std::endl;
                 return;
             }
         }
@@ -327,7 +338,7 @@ namespace Storage {
                 entries[i].file_size = 0;
 
                 Storage::disk_mgr.write_sector(1, sector, buffer);
-                std::cout << "File created: " << name << std::endl;
+                // std::cout << "File created: " << name << std::endl;
                 return;
             }
         }

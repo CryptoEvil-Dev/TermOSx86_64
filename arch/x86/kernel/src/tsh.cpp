@@ -1,4 +1,7 @@
 #include "../include/tsh.hpp"
+#include "task.hpp"
+
+extern "C" void editor_main();
 
 namespace Shell {
 
@@ -24,13 +27,15 @@ namespace Shell {
         {"clear", cmd_clear, "Clear screen"},
         {"help",  cmd_help,  "Show this help"},
         {"touch", cmd_touch, "Create file"},
-        {"history", cmd_history, "History"}
+        {"history", cmd_history, "History"},
+        {"rm", cmd_rm, "Remove file/directory"},
+        {"edit", cmd_edit, "System Text Editor"}
     };
 
     void run() {
         char input[128];
         while (true) {
-            std::cout << "> ";
+            std::cout << Storage::current_path << "> ";
             std::cin >> input;
 
             if (input[0] == '!' && std::strlen(input) > 1) {
@@ -75,9 +80,27 @@ namespace Shell {
 
     // --- Реализации команд ---
     void cmd_ls(char* arg)    { Storage::fat32_ls(); }
-    void cmd_pwd(char* arg)   { std::cout << "/" << std::endl; } // Пока заглушка
+    void cmd_pwd(char* arg)   { std::cout << Storage::current_path << std::endl; } // Пока заглушка
     void cmd_clear(char* arg) { term.clear(); }
 
+
+
+    void cmd_edit(char* arg) {
+        Tasking::Task* t = Tasking::create_task(editor_main);
+        if (!t) {
+            std::cout << "Error: could not create task!\n";
+            return;
+        }
+        // Ожидаем завершения редактора (состояние ZOMBIE)
+        while (t->state != Tasking::TASK_ZOMBIE) {
+            Tasking::yield();
+        }
+        // После завершения редактор остаётся в списке, но планировщик его
+        // игнорирует. Пока что просто забываем.
+    }
+
+
+    
     void add_to_history(const char* cmd) {
         if (std::strlen(cmd) == 0) return;
 
@@ -92,11 +115,20 @@ namespace Shell {
         }
     }
 
+    void cmd_rm(char* arg) {
+        if(!arg) {
+            std::cout << "Usage: rm <FILE/DIRECTORY>" << std::endl;
+            return;
+        }
+        Storage::fat32_rm(arg);
+    }
+
     
     void cmd_cd(char* arg) {
         if (!arg) {
-            std::cout << "Usage: cd <directory>" << std::endl;
-            return;
+            // std::cout << "Usage: cd <directory>" << std::endl;
+            // return;
+            Storage::fat32_cd("/");
         }
         Storage::fat32_cd(arg); // Должно вызывать функцию из fat32.cpp
     }

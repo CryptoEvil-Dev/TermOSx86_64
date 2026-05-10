@@ -1,6 +1,7 @@
 #include "../include/idt.hpp"
 #include "../include/pic.hpp"
 #include "../include/io.hpp"
+#include "../include/task.hpp"
 #include "stdio.hpp"
 #include "iostream.hpp"
 
@@ -15,6 +16,7 @@ static uint32_t kbd_head = 0;
 static uint32_t kbd_tail = 0;
 
 static bool shift_pressed = false;
+static bool ctrl_pressed = false;   // <-- добавлено
 
 static const char kbd_us[128] = {
     0,  27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
@@ -30,59 +32,68 @@ static const char kbd_us_shift[128] = {
     '|', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' '
 };
 
+// Внешние asm-функции
 extern "C" void isr_generic();
+extern "C" void isr_syscall();
+extern "C" void isr_yield();
+extern "C" void irq32();
+extern "C" void irq33();
 
-// --- Обработчики (ISR/IRQ) ---
-
-extern "C" void irq0_handler(interrupt_frame* frame) {
-    ticks++;
-    PIC::send_eoi(0);
-}
-
-extern "C" void irq1_handler(interrupt_frame* frame) {
+// Обработчик клавиатуры (без аргументов, EOI отправляется здесь)
+extern "C" void irq1_handler() {
     uint8_t scancode = inb(0x60);
 
-    // Обработка нажатия/отпускания Shift
+    // Обработка Ctrl
+    if (scancode == 0x1D) {
+        ctrl_pressed = true;
+    } else if (scancode == 0x9D) {
+        ctrl_pressed = false;
+    }
+
+    // Обработка Shift
     if (scancode == 0x2A || scancode == 0x36) {
         shift_pressed = true;
     } else if (scancode == 0xAA || scancode == 0xB6) {
         shift_pressed = false;
     }
 
-    if(scancode == 0x49) {
+    // Прокрутка (дополнительные клавиши)
+    if (scancode == 0x49) {
         term.view_offset -= 1;
         term.refresh();
-    }
-    if(scancode == 0x51) {
+    } else if (scancode == 0x51) {
         term.view_offset += 1;
         term.refresh();
     }
-    // Обработка обычных клавиш
-    else if (!(scancode & 0x80)) { 
-        // ВЫБИРАЕМ ТАБЛИЦУ
-        char c = shift_pressed ? kbd_us_shift[scancode] : kbd_us[scancode];
-        
-        if (c > 0) kbd_push(c);
+    // Обычные клавиши (нажатие)
+    else if (!(scancode & 0x80)) {
+        // Проверка Ctrl+C
+        if (ctrl_pressed && scancode == 0x2E) {   // scancode C
+            Tasking::Task* fg = Tasking::get_foreground_task();
+            if (fg) {
+                Tasking::kill_task(fg);
+            }
+        } else {
+            char c = shift_pressed ? kbd_us_shift[scancode] : kbd_us[scancode];
+            if (c > 0) {
+                kbd_push(c);
+            }
+        }
     }
 
+    // Отправляем EOI для IRQ1
     PIC::send_eoi(1);
 }
 
+// Универсальный обработчик исключений
 extern "C" void generic_handler(interrupt_frame* frame) {
-    // Так как мы не знаем точный номер без таблицы переходов, 
-    // просто пишем общее предупреждение
     std::cerr << "\n[IDT] Received unhandled interrupt/exception!" << std::endl;
-    
-    // Если это аппаратное прерывание (IRQ), нужно отправить EOI, 
-    // иначе другие прерывания (клавиатура/таймер) перестанут работать.
-    // На всякий случай отправляем в оба контроллера.
-    PIC::send_eoi(0); // Master
-    PIC::send_eoi(8); // Slave
+    // Чтобы не повесить систему, отправляем EOI ведущему и ведомому контроллерам
+    PIC::send_eoi(0);
+    PIC::send_eoi(8);
 }
 
-
-// --- Системные функции ---
-
+// Установка дескриптора IDT
 void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags) {
     uint64_t addr = (uint64_t)isr;
     idt[vector].isr_low    = (uint16_t)(addr & 0xFFFF);
@@ -109,20 +120,20 @@ char kbd_pop() {
     return c;
 }
 
-
 namespace Interrupts {
     void init() {
         PIC::init(0x20, 0x28);
 
-        // Паникуем по умолчанию
-        for(int i = 0; i < 256; i++) {
+        // По умолчанию все векторы указывают на isr_generic
+        for (int i = 0; i < 256; i++) {
             idt_set_descriptor(i, (void*)isr_generic, 0x8E);
         }
 
-        // Регистрируем конкретные IRQ
-        idt_set_descriptor(0,  (void*)isr0,  0x8E); 
-        idt_set_descriptor(32, (void*)irq32, 0x8E); 
-        idt_set_descriptor(33, (void*)irq33, 0x8E); 
+        // Переопределяем нужные векторы
+        idt_set_descriptor(32, (void*)irq32, 0x8E);          // IRQ0 (таймер)
+        idt_set_descriptor(33, (void*)irq33, 0x8E);          // IRQ1 (клавиатура)
+        idt_set_descriptor(0x80, (void*)isr_syscall, 0x8E | 0x60); // системный вызов
+        idt_set_descriptor(0x81, (void*)isr_yield, 0x8E);     // yield
 
         idtr.base = (uint64_t)&idt;
         idtr.limit = sizeof(idt) - 1;
@@ -131,12 +142,4 @@ namespace Interrupts {
         PIC::unmask(0);
         PIC::unmask(1);
     }
-}
-
-// Паникуем исключительно в std::err
-extern "C" void isr0_handler(interrupt_frame* frame) {
-    std::cerr << "\n--- KERNEL PANIC ---" << std::endl;
-    std::cerr << "Exception: " << std::dec << (int)frame->rip << " (Divide by Zero)" << std::endl;
-    std::cerr << "RSP: " << std::hex << (void*)frame->rsp << std::endl;
-    while(1) __asm__ volatile("hlt");
 }
