@@ -1,6 +1,11 @@
 #include "../include/tsh.hpp"
 
 namespace Shell {
+
+    char history[HISTORY_SIZE][64];
+    int history_count = 0;
+
+
     typedef void (*command_func)(char*);
 
     struct Command {
@@ -14,6 +19,7 @@ namespace Shell {
         {"ls",    cmd_ls,    "List directory content"},
         {"cd",    cmd_cd,    "Change directory"},
         {"mkdir", cmd_mkdir, "Create directory"},
+        {"cat", cmd_cat, "Show content in file"},
         {"pwd",   cmd_pwd,   "Print working directory"},
         {"clear", cmd_clear, "Clear screen"},
         {"help",  cmd_help,  "Show this help"},
@@ -93,6 +99,14 @@ namespace Shell {
             return;
         }
         Storage::fat32_cd(arg); // Должно вызывать функцию из fat32.cpp
+    }
+
+    void cmd_cat(char* arg) {
+        if(!arg) {
+            std::cout << "Usage: cat <filename>" << std::endl;
+            return;
+        }
+        Storage::fat32_cat(arg);
     }
 
     void cmd_mkdir(char* arg) {

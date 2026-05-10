@@ -8,8 +8,9 @@
 namespace Shell {
 
     const int HISTORY_SIZE = 10;
-    char history[HISTORY_SIZE][64];
-    int history_count = 0;
+    
+    extern char history[HISTORY_SIZE][64];
+    extern int history_count;
 
     void add_to_history(const char* cmd);
 
@@ -19,6 +20,7 @@ namespace Shell {
     // Обработчики команд
     void cmd_ls(char* arg);
     void cmd_cd(char* arg);
+    void cmd_cat(char* arg);
     void cmd_mkdir(char* arg);
     void cmd_pwd(char* arg);
     void cmd_clear(char* arg);

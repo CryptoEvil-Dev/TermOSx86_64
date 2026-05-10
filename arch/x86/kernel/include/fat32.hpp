@@ -51,13 +51,14 @@ namespace Storage {
     } __attribute__((packed));
 
 
-    static uint32_t fat_start_sector;
-    static uint32_t data_start_sector;
-    static uint32_t root_dir_sector;
-    static uint8_t  sectors_per_cluster_global;
+    extern uint32_t fat_start_sector;
+    extern uint32_t data_start_sector;
+    extern uint32_t root_dir_sector;
+    extern uint8_t  sectors_per_cluster_global;
+    extern uint32_t current_dir_cluster;
 
-    static uint32_t current_dir_cluster = 2; // По умолчанию корень
-    static char current_path[256] = "/";
+    extern uint32_t current_dir_cluster;
+    extern char current_path[256];
     uint32_t get_sector_by_cluster(uint32_t cluster);
 
     uint32_t fat32_find_free_cluster();

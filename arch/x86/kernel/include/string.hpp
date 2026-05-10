@@ -27,4 +27,12 @@ namespace std {
     static inline void strcpy(char* dest, const char* src) {
         while ((*dest++ = *src++));
     }
+
+    static inline void* memset(void* dest, int ch, uint64_t count) {
+        uint8_t* p = (uint8_t*)dest;
+        while (count--) {
+            *p++ = (uint8_t)ch;
+        }
+        return dest;
+    }
 }

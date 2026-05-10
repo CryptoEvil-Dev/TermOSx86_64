@@ -4,6 +4,13 @@
 #include "../include/string.hpp"
 
 namespace Storage {
+    uint32_t fat_start_sector = 0;
+    uint32_t data_start_sector = 0;
+    uint32_t root_dir_sector = 0;
+    uint8_t  sectors_per_cluster_global = 0;
+    uint32_t current_dir_cluster = 2;
+    char current_path[256] = "/";
+
 
     void fat32_init(uint8_t drive_idx) {
         uint8_t buffer[512];
@@ -31,6 +38,7 @@ namespace Storage {
     
     // Начальный сектор корневой директории
     // Формула: DataStart + (RootCluster - 2) * SectorsPerCluster
+    sectors_per_cluster_global = bpb->sectors_per_cluster;
     root_dir_sector = data_start_sector + (bpb->root_cluster - 2) * bpb->sectors_per_cluster;
 
     std::cout << "[FAT32] Root Sector: " << root_dir_sector << std::endl;
@@ -49,10 +57,9 @@ namespace Storage {
 
     void fat32_ls() {
         uint8_t buffer[512];
-        // Читаем самый первый сектор корневой директории
-        // disk_mgr.read_sector(1, get_sector_by_cluster(current_dir_cluster), buffer);
         uint32_t sector = get_sector_by_cluster(current_dir_cluster);
         disk_mgr.read_sector(1, sector, buffer);
+
 
 
         fat32_dir_entry_t* entry = (fat32_dir_entry_t*)buffer;
@@ -97,21 +104,22 @@ namespace Storage {
 
 
     bool fat_name_match(const char* input, const char* fat_name) {
-        // Выведем каждый байт того, что пришло с диска
-        std::cout << "DEBUG: [";
-        for(int i=0; i<8; i++) {
-            if(fat_name[i] == ' ') std::cout << '_'; // Пробелы заменим на подчеркивание
-            else std::cout << (char)fat_name[i];
+        for (int i = 0; i < 8; i++) {
+            char in_c = input[i];
+            // Игнорируем конец строки, точки и переносы
+            if (in_c == '\0' || in_c == '.' || in_c == '\n' || in_c == '\r') {
+                // Если ввод кончился, на диске должны быть пробелы
+                for (int k = i; k < 8; k++) {
+                    if (fat_name[k] != ' ') return false;
+                }
+                return true;
+            }
+            if (in_c >= 'a' && in_c <= 'z') in_c -= 32; // toupper
+            if (in_c != fat_name[i]) return false;
         }
-        std::cout << "]" << std::endl;
-
-        // ВРЕМЕННО: пусть возвращает true для всего, что начинается на 'T'
-        if (input[0] == 'T' || input[0] == 't') {
-            if (fat_name[0] == 'T') return true;
-        }
-
-        return false; 
+        return true;
     }
+
 
 
 
@@ -142,36 +150,85 @@ namespace Storage {
 
 
     void fat32_mkdir(const char* name) {
-        // 1. Находим и занимаем кластер
+        // Существует ли уже такой объект?
+        fat32_dir_entry_t existing;
+        if (fat32_find_file(name, &existing)) {
+            std::cerr << "Error: Directory or file already exists!" << std::endl;
+            return;
+        }
+
+        // Читаем родительский каталог (тот, в котором создаём)
+        uint8_t parent_buffer[512];
+        uint32_t parent_sector = get_sector_by_cluster(current_dir_cluster);
+        if (!Storage::disk_mgr.read_sector(1, parent_sector, parent_buffer)) {
+            std::cerr << "Error reading parent directory!" << std::endl;
+            return;
+        }
+
+        // Поиск свободного кластера
         uint32_t new_cluster = fat32_find_free_cluster();
-        if (new_cluster == 0) return;
-        fat32_update_fat(new_cluster, 0x0FFFFFFF); // Mark as EOF
-        
-        // 2. ЗАНУЛЯЕМ сектор этого кластера (критически важно!)
-        uint8_t zero_buf[512];
-        for(int i=0; i<512; i++) zero_buf[i] = 0;
-        Storage::disk_mgr.write_sector(1, get_sector_by_cluster(new_cluster), zero_buf);
-        
-        // 3. Создаем запись в текущей директории
-        uint8_t dir_buf[512];
-        uint32_t current_sector = get_sector_by_cluster(current_dir_cluster);
-        Storage::disk_mgr.read_sector(1, current_sector, dir_buf);
-        
-        fat32_dir_entry_t* entries = (fat32_dir_entry_t*)dir_buf;
+        if (new_cluster == 0) {
+            std::cerr << "No free clusters!" << std::endl;
+            return;
+        }
+
+        // Помечаем новый кластер как конец цепочки в FAT
+        fat32_update_fat(new_cluster, 0x0FFFFFFF);
+
+        // Заполняем новый кластер записями "." и ".."
+        fat32_dir_entry_t dot_entries[16];
+        std::memset(dot_entries, 0, sizeof(dot_entries));          // очистка (можно циклами)
+
+        // Запись "."
+        std::memset(dot_entries[0].name, ' ', 11);
+        dot_entries[0].name[0] = '.';
+        dot_entries[0].attributes = 0x10;                     // флаг каталога
+        dot_entries[0].cluster_low = new_cluster & 0xFFFF;
+        dot_entries[0].cluster_high = (new_cluster >> 16) & 0xFFFF;
+
+        // Запись ".."
+        uint32_t parent_cluster = (current_dir_cluster == 2) ? 0 : current_dir_cluster;
+        std::memset(dot_entries[1].name, ' ', 11);
+        dot_entries[1].name[0] = '.';
+        dot_entries[1].name[1] = '.';
+        dot_entries[1].attributes = 0x10;
+        dot_entries[1].cluster_low = parent_cluster & 0xFFFF;
+        dot_entries[1].cluster_high = (parent_cluster >> 16) & 0xFFFF;
+
+        if (!Storage::disk_mgr.write_sector(1, get_sector_by_cluster(new_cluster), (uint8_t*)dot_entries)) {
+            std::cerr << "Error writing new directory cluster!" << std::endl;
+            return;
+        }
+
+        // Ищем свободный слот в родительском каталоге
+        fat32_dir_entry_t* parent_entries = (fat32_dir_entry_t*)parent_buffer;
         for (int i = 0; i < 16; i++) {
-            if (entries[i].name[0] == 0x00 || (uint8_t)entries[i].name[0] == 0xE5) {
-                for(int j=0; j<11; j++) entries[i].name[j] = ' ';
-                for(int j=0; j<8 && name[j]; j++) entries[i].name[j] = (name[j]>='a') ? name[j]-32 : name[j];
-            
-                entries[i].attributes = 0x10; // Directory
-                entries[i].cluster_low = (uint16_t)(new_cluster & 0xFFFF);
-                entries[i].cluster_high = (uint16_t)((new_cluster >> 16) & 0xFFFF);
-                
-                Storage::disk_mgr.write_sector(1, current_sector, dir_buf);
-                std::cout << "Directory created at cluster " << new_cluster << std::endl;
+            if (parent_entries[i].name[0] == 0x00 || (uint8_t)parent_entries[i].name[0] == 0xE5) {
+                // Формируем имя 8.3 (без расширения — одни пробелы)
+                std::memset(parent_entries[i].name, ' ', 11);
+                int j;
+                for (j = 0; j < 8 && name[j] != '\0' && name[j] != '.'; j++) {
+                    char c = name[j];
+                    if (c >= 'a' && c <= 'z') c -= 32;
+                    parent_entries[i].name[j] = c;
+                }
+                // Остальные символы имени и расширение остаются пробелами
+
+                parent_entries[i].attributes = 0x10;          // Directory
+                parent_entries[i].cluster_low = new_cluster & 0xFFFF;
+                parent_entries[i].cluster_high = (new_cluster >> 16) & 0xFFFF;
+                parent_entries[i].file_size = 0;              // для каталогов обычно 0
+
+                // Записываем обновлённый родительский каталог
+                if (!Storage::disk_mgr.write_sector(1, parent_sector, parent_buffer)) {
+                    std::cerr << "Error writing parent directory!" << std::endl;
+                    return;
+                }
+                std::cout << "Directory created: " << name << " (cluster " << new_cluster << ")" << std::endl;
                 return;
             }
         }
+        std::cerr << "No free entry in parent directory!" << std::endl;
     }
 
 
@@ -179,20 +236,21 @@ namespace Storage {
     void fat32_cd(const char* path) {
         // Если ввели ".." или "/", возвращаемся в корень (пока так)
         if (std::strcmp(path, "..") == 0 || std::strcmp(path, "/") == 0) {
-            current_dir_cluster = 2; 
-            std::cout << "Back to root." << std::endl;
+            current_dir_cluster = 2; // Кластер корня всегда 2
             return;
         }
 
+
         fat32_dir_entry_t entry;
         if (fat32_find_file(path, &entry)) {
-            if (entry.attributes & 0x10) {
+            if (entry.attributes & 0x10) { // Проверка, что это директория
                 current_dir_cluster = ((uint32_t)entry.cluster_high << 16) | entry.cluster_low;
+                std::cout << "DEBUG: Cluster changed to " << current_dir_cluster << std::endl;
             } else {
-                std::cerr << "Not a directory!" << std::endl;
+                std::cout << path << " is a file, not a directory!" << std::endl;
             }
         } else {
-            std::cerr << "Directory not found!" << std::endl;
+            std::cout << "Directory not found!" << std::endl;
         }
     }
 
@@ -221,20 +279,25 @@ namespace Storage {
     void fat32_touch(const char* name) {
         uint8_t buffer[512];
         uint32_t sector = get_sector_by_cluster(current_dir_cluster);
-        disk_mgr.read_sector(1, sector, buffer);
+        Storage::disk_mgr.read_sector(1, sector, buffer);
         fat32_dir_entry_t* entries = (fat32_dir_entry_t*)buffer;
 
         for (int i = 0; i < 16; i++) {
             if (entries[i].name[0] == 0x00 || (uint8_t)entries[i].name[0] == 0xE5) {
+                // Подготовка имени 8.3
                 for(int j=0; j<11; j++) entries[i].name[j] = ' ';
-                for(int j=0; j<8 && name[j] != '\0' && name[j] != '.'; j++) entries[i].name[j] = name[j];
+                for(int j=0; j<8 && name[j] != '\0' && name[j] != '.'; j++) {
+                    char c = name[j];
+                    if(c >= 'a' && c <= 'z') c -= 32;
+                    entries[i].name[j] = c;
+                }
 
-                entries[i].attributes = 0x20; // File
-                entries[i].cluster_low = 0;
+                entries[i].attributes = 0x20; // Флаг обычного файла (Archive)
+                entries[i].cluster_low = 0;   // Кластер не нужен для пустого файла
                 entries[i].cluster_high = 0;
                 entries[i].file_size = 0;
 
-                disk_mgr.write_sector(1, sector, buffer);
+                Storage::disk_mgr.write_sector(1, sector, buffer);
                 std::cout << "File created: " << name << std::endl;
                 return;
             }
@@ -245,15 +308,17 @@ namespace Storage {
 
 
     uint32_t fat32_find_free_cluster() {
-        uint32_t fat_table[128]; // Буфер для одного сектора FAT (512 байт / 4)
+        uint32_t fat_table[128]; // Буфер для одного сектора FAT (512 байт)
         
-        // Сканируем первые несколько секторов FAT
-        for (uint32_t i = 0; i < 50; i++) {
-            Storage::disk_mgr.read_sector(1, fat_start_sector + i, (uint8_t*)fat_table);
+        // Сканируем FAT-таблицу сектор за сектором
+        for (uint32_t i = 0; i < 100; i++) { // Проверим первые 100 секторов
+            if (!disk_mgr.read_sector(1, fat_start_sector + i, (uint8_t*)fat_table)) return 0;
+            
             for (int j = 0; j < 128; j++) {
+                // В FAT32 свободный кластер помечен как 0x00000000
                 if (fat_table[j] == 0x00000000) {
                     uint32_t cluster = i * 128 + j;
-                    if (cluster >= 2) return cluster; // Кластеры 0 и 1 зарезервированы
+                    if (cluster >= 2) return cluster; // 0 и 1 зарезервированы
                 }
             }
         }
