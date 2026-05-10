@@ -29,6 +29,7 @@ void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags);
 
 // Интерфейс клавиатуры (для iostream)
 void kbd_init();
+void kbd_push(char c);
 char kbd_pop(); 
 
 namespace Interrupts {

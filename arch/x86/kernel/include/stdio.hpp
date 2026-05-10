@@ -16,17 +16,25 @@ public:
     void print(const char* str);
     void print_hex(uint64_t n);
     void clear();
+    void refresh();
     void set_color(vga_color fg, vga_color bg);
+    // void update_cursor();
 
     vga_color get_bg();
     vga_color get_fg();
 
+    int view_offset = 0;
+
 private:
+    void set_80x50();
     void scroll();
     void update_cursor();
 
     uint16_t* vidmem;
     int x, y;
+    int max_x = 50;
+    int max_y = 80;
+    uint16_t screen_buffer[80 * 200];
     vga_color fg, bg;
     uint8_t current_color;
 };

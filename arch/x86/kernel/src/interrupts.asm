@@ -6,6 +6,9 @@ extern isr0_handler
 extern irq0_handler
 extern irq1_handler
 
+global isr_generic
+extern generic_handler
+
 ; Помощник для сохранения контекста
 %macro PUSH_ALL 0
     push rax
@@ -67,5 +70,16 @@ irq33:
     PUSH_ALL
     mov rdi, rsp
     call irq1_handler
+    POP_ALL
+    iretq
+
+
+isr_generic:
+    ; Мы не знаем, какой это номер, если не создадим 256 функций.
+    ; Но для теста и для защиты системы от зависания сделаем так:
+    PUSH_ALL
+    mov rdi, rsp    ; 1-й аргумент: interrupt_frame*
+    ; Номер прерывания мы пока не передаем (это сложно без макросов для 256 штук)
+    call generic_handler
     POP_ALL
     iretq

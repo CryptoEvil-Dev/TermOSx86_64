@@ -77,4 +77,31 @@ namespace Storage {
         while (inb(port + 7) & 0x80); // Wait for BSY to clear
         while (!(inb(port + 7) & 0x40)); // Wait for DRDY to set
     }
+
+    bool DiskManager::write_sector(uint8_t drive_idx, uint32_t lba, uint8_t* buffer) {
+        if (drive_idx >= drive_count) return false;
+        Drive& d = drives[drive_idx];
+        
+        outb(d.base_port + 6, 0xE0 | ((d.type == ATA_SLAVE) << 4) | ((lba >> 24) & 0x0F));
+        outb(d.base_port + 2, 1);
+        outb(d.base_port + 3, (uint8_t)lba);
+        outb(d.base_port + 4, (uint8_t)(lba >> 8));
+        outb(d.base_port + 5, (uint8_t)(lba >> 16));
+        outb(d.base_port + 7, 0x30); // Команда "Write Sectors"
+        
+        ata_wait_ready(d.base_port);
+        
+        // Передаем данные диску
+        uint16_t* ptr = (uint16_t*)buffer;
+        for (int i = 0; i < 256; i++) {
+            outw(d.base_port, ptr[i]);
+        }
+    
+        // Ждем, пока диск закончит запись на физический блин
+        outb(d.base_port + 7, 0xE7); // Каш-флаш (на всякий случай)
+        ata_wait_ready(d.base_port);
+    
+        return true;
+    }
+
 }

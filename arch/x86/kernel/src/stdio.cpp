@@ -1,4 +1,5 @@
 #include "../include/stdio.hpp"
+#include "../include/io.hpp"
 
 Terminal term;
 
@@ -18,41 +19,75 @@ void Terminal::set_color(vga_color fg, vga_color bg) {
 }
 
 void Terminal::clear() {
+    // Чистим ровно 2000 ячеек (80*25)
     for(int i = 0; i < 80 * 25; i++) {
         vidmem[i] = (uint16_t)' ' | (uint16_t)current_color << 8;
     }
     x = 0;
     y = 0;
+    update_cursor();
 }
 
 void Terminal::put_char(char c) {
-    if(c == '\n') {
+    if (c == '\n') {
         x = 0;
         y++;
-    } else if(c == '\b') {
-        if(x > 0) x--;
-        else if(y > 0) { y--; x = 79; }
-        vidmem[y * 80 + x] = (uint16_t)' ' | (uint16_t)current_color << 8;
+    } else if (c == '\b') {
+        if (x > 0) {
+            x--;
+            vidmem[y * 80 + x] = (uint16_t)' ' | (uint16_t)current_color << 8;
+        } else if (y > 0) {
+            y--;
+            x = 79;
+            vidmem[y * 80 + x] = (uint16_t)' ' | (uint16_t)current_color << 8;
+        }
+        update_cursor();
         return;
     } else {
         vidmem[y * 80 + x] = (uint16_t)c | (uint16_t)current_color << 8;
         x++;
     }
 
+    // Перенос строки по достижению края
+    if (x >= 80) {
+        x = 0;
+        y++;
+    }
+
+    // Скроллинг при достижении низа экрана (25-я строка)
     if (y >= 25) {
-        scroll();
+        // Копируем строки 1-24 на места 0-23
+        for (int i = 0; i < 24 * 80; i++) {
+            vidmem[i] = vidmem[i + 80];
+        }
+        // Забиваем последнюю строку пробелами
+        for (int i = 24 * 80; i < 25 * 80; i++) {
+            vidmem[i] = (uint16_t)' ' | (uint16_t)current_color << 8;
+        }
         y = 24;
+    }
+    update_cursor();
+}
+
+void Terminal::refresh() {
+    // Копируем кусок из screen_buffer в реальный vidmem (0xB8000)
+    for(int i = 0; i < 80 * 25; i++) {
+        vidmem[i] = screen_buffer[view_offset * 80 + i];
     }
 }
 
+
 void Terminal::scroll() {
-    for (int i = 0; i < 24 * 80; i++) {
+    // Копируем 49 строк вверх
+    for (int i = 0; i < 49 * 80; i++) {
         vidmem[i] = vidmem[i + 80];
     }
-    for (int i = 24 * 80; i < 25 * 80; i++) {
+    // Очищаем 50-ю строку
+    for (int i = 49 * 80; i < 50 * 80; i++) {
         vidmem[i] = (uint16_t)' ' | (uint16_t)current_color << 8;
     }
 }
+
 
 void Terminal::print(const char* str) {
     for (int i = 0; str[i] != '\0'; i++) {
@@ -61,7 +96,12 @@ void Terminal::print(const char* str) {
 }
 
 void Terminal::update_cursor() {
-    // Позже здесь будет код общения с портами 0x3D4/0x3D5
+    uint16_t pos = y * 80 + x;
+ 
+    outb(0x3D4, 0x0F);
+    outb(0x3D5, (uint8_t)(pos & 0xFF));
+    outb(0x3D4, 0x0E);
+    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
 }
 
 void Terminal::print_hex(uint64_t n) {
@@ -79,6 +119,7 @@ void Terminal::init() {
     x = 0; y = 0;
     set_color(WHITE, BLACK);
     clear();
+    // set_80x50();
 }
 
 vga_color Terminal::get_fg() {
@@ -87,4 +128,18 @@ vga_color Terminal::get_fg() {
 
 vga_color Terminal::get_bg() {
     return bg;
+}
+
+void Terminal::set_80x50() {
+    // 1. Загружаем шрифт 8x8 (вместо 8x16)
+    // Это делается через BIOS прерывание 0x10, но в 64-бит мы сделаем через порты
+    outb(0x3D4, 0x09);
+    uint8_t max_scanline = inb(0x3D5) & 0xE0;
+    outb(0x3D5, max_scanline | 0x07); // Высота символа 8 линий
+
+    outb(0x3D4, 0x12);
+    outb(0x3D5, 0x9F); // 400 линий вертикально
+
+    // 2. Обнови пределы в Terminal
+    // Теперь y может расти до 49!
 }

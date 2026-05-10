@@ -16,10 +16,30 @@ BOOT_OBJ = build/boot.o
 
 BIN = build/TermOS.bin
 
-all: $(BIN) run
+
+DISK_IMG = build/disk.img
+DISK_SIZE = 256M
+
+.PHONY: all run clean prepare_disk
+
+all: run
+
+# Команда для подготовки диска
+prepare_disk:
+	@mkdir -p build
+	@if [ ! -f $(DISK_IMG) ]; then \
+		echo "[DISK] Creating 256MB disk..."; \
+		qemu-img create -f raw $(DISK_IMG) $(DISK_SIZE); \
+		mkfs.vfat -F 32 -I $(DISK_IMG); \
+		echo "TermOS Test File" > build/hello.txt; \
+		mcopy -i $(DISK_IMG) build/hello.txt ::/HELLO.TXT; \
+		mcopy -i $(DISK_IMG) build/hello.txt ::/KERNEL.BIN; \
+	fi
+
 
 # Ссылка всех объектов
 $(BIN): $(BOOT_OBJ) $(CPP_OBJECTS) $(ASM_OBJECTS)
+	@echo "[LINK] $@"
 	$(LD) -T linker.ld -o $(BIN) $(BOOT_OBJ) $(CPP_OBJECTS) $(ASM_OBJECTS) -Map=build/output.map
 
 # 1. Правило для C++ файлов
@@ -37,9 +57,12 @@ $(BOOT_OBJ): boot/boot.asm
 	@mkdir -p build
 	$(AS) $(ASFLAGS) boot/boot.asm -o $(BOOT_OBJ)
 
-run:
-	qemu-img create -f raw build/disk.img 256M
-	qemu-system-x86_64 -drive format=raw,file=$(BIN) -drive file=build/disk.img,format=raw,if=ide
+
+run: $(BIN) prepare_disk
+	@echo "[RUN] Launching QEMU..."
+	qemu-system-x86_64 -drive format=raw,file=$(BIN) \
+	                   -drive format=raw,file=$(DISK_IMG),if=ide,index=1,media=disk
+
 
 clean:
 	rm -rf build/*
