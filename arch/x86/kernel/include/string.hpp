@@ -35,4 +35,23 @@ namespace std {
         }
         return dest;
     }
+
+    static inline char* strcat(char* dest, const char* src) {
+        char* ptr = dest;
+
+        // 1. Идем до конца первой строки
+        while (*ptr != '\0') {
+            ptr++;
+        }
+
+        // 2. Копируем вторую строку в конец первой
+        while (*src != '\0') {
+            *ptr++ = *src++;
+        }
+
+        // 3. Не забываем про нуль-терминатор
+        *ptr = '\0';
+
+        return dest;
+    }
 }

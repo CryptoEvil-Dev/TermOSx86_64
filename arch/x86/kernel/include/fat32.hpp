@@ -72,8 +72,11 @@ namespace Storage {
     void fat32_cat(const char* filename);
     void fat32_mkdir(const char* name);
     void fat32_cd(const char* path);
+    void fat32_pwd();
     void fat32_rm(const char* filename);
     void fat32_touch(const char* name);
     bool fat_name_match(const char* input, const char* fat_name);
+
+    uint32_t fat32_get_parent_cluster();
     
 }
