@@ -139,11 +139,11 @@ init_pm:
     jmp CODE_SEG_64:init_64
 
 setup_paging:
-    mov edi, 0x1000
-    mov cr3, edi
-    xor eax, eax
-    mov ecx, 4096
-    rep stosd
+    mov edi, 0x1000  ; Указатель на начало памяти
+    mov cr3, edi     ; 
+    xor eax, eax     ; Значение, которым будем заполнять область (нулями)
+    mov ecx, 4096    ; Количество повторений
+    rep stosd        ; Зануляем память: Repeat Store String DWORD. Записать 4 байта - Смещение на 4 байта - Уменьшить ECX на 1
 
     mov dword [0x1000], 0x2003
     mov dword [0x2000], 0x3003
@@ -162,16 +162,16 @@ setup_paging:
 enable_long_mode:
     mov eax, cr4
     or eax, 1 << 5
-    mov cr4, eax
+    mov cr4, eax    ; Включаем PAE (Phisical Address Extension)
 
-    mov ecx, 0xC0000080
-    rdmsr
-    or eax, 1 << 8
-    wrmsr
+    mov ecx, 0xC0000080 ; Загружаем адрес регистра EFER (Extended Feature Enable Register)
+    rdmsr               ; Читаем состояние регистра MSR (EDX:EAX)
+    or eax, 1 << 8      ; Выставляем 8-й бит (LME - Long Mode Enabled) в 1
+    wrmsr               ; Сохраняем изменения
 
-    mov eax, cr0
+    mov eax, cr0        ; Включаем Pagging
     or eax, 1 << 31
-    mov cr0, eax
+    mov cr0, eax        ; Добро пожаловать в Long Mode
     ret
 
 
