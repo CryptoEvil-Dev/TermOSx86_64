@@ -41,3 +41,8 @@
 - `task` - **Not Implemented!**. Библиотека для работы с многозадачностью.
 - `tsh` - Пользовательская оболочка для исполнения команд (Работает с stdio, stdout, stderr).
 - `vfs` - Виртуальная файловая система для поддержки потоков ввода/вывода (stdin, stdout, stderr)
+
+# Как сохранить образ
+**Не бутаица!**
+- `make image`
+- `sudo dd if=build/flash.img of=/dev/sdX bs=4M status=progress conv=fdatasync`

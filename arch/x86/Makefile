@@ -20,6 +20,8 @@ BIN = build/TermOS.bin
 DISK_IMG = build/disk.img
 DISK_SIZE = 256M
 
+FINAL_IMG=build/flash.img
+
 .PHONY: all run clean prepare_disk
 
 all: run
@@ -63,6 +65,23 @@ run: $(BIN) prepare_disk
 	qemu-system-x86_64 -drive format=raw,file=$(BIN) \
 	                   -drive format=raw,file=$(DISK_IMG),if=ide,index=1,media=disk
 
+# 3. ГЛАВНОЕ ПРАВИЛО: Создание полноценного образа жесткого диска/флешки
+image: $(BIN) prepare_disk
+	@echo "[IMAGE] Creating unified flash image: $(FINAL_IMG)..."
+	@# Создаем пустой файл образа, равный: размер ядра/загрузчика (в пределах 64 секторов) + размер FAT32
+	@# Сектор 64 — это ровно 32 КБ от начала диска
+	dd if=/dev/zero of=$(FINAL_IMG) bs=512 count=64 status=none
+	@# Записываем загрузчик и ядро в самое начало (с 0-го сектора)
+	dd if=$(BIN) of=$(FINAL_IMG) bs=512 conv=notrunc status=none
+	@# Склеиваем с томом FAT32, начиная строго с 64-го сектора
+	dd if=$(DISK_IMG) of=$(FINAL_IMG) bs=512 seek=64 conv=notrunc status=none
+	@# Создаем правильную MBR разметку: помечаем раздел с 64-го сектора как активный FAT32 (тип 0x0c)
+	@echo -e "n\np\n1\n64\n\nt\nc\na\n1\nw" | fdisk $(FINAL_IMG) > /dev/null 2>&1
+	@echo "[IMAGE] Done! $(FINAL_IMG) is ready for burning or emulating."
+
+# run: image
+# 	@echo "[RUN] Launching QEMU with unified $(FINAL_IMG)..."
+# 	qemu-system-x86_64 -drive format=raw,file=$(FINAL_IMG),if=ide,index=0,media=disk
 
 clean:
 	rm -rf build/*
