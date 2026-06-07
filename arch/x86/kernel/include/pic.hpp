@@ -9,12 +9,12 @@
 #include "io.hpp"
 
 namespace PIC {
-    const uint8_t MASTER_COMMAND = 0x20;
-    const uint8_t MASTER_DATA    = 0x21;
-    const uint8_t SLAVE_COMMAND  = 0xA0;
-    const uint8_t SLAVE_DATA     = 0xA1;
+    const uint8_t MASTER_COMMAND = 0x20;    // Регистр команд Master (ICW1, OCW2, OCW3)
+    const uint8_t MASTER_DATA    = 0x21;    // Регистр данных Master (ICW2-ICW4, маска IMR)
+    const uint8_t SLAVE_COMMAND  = 0xA0;    // Регистр команд Slave
+    const uint8_t SLAVE_DATA     = 0xA1;    // Регистр данных Slave
 
-    const uint8_t EOI = 0x20; // End of Interrupt
+    const uint8_t EOI = 0x20;               // End of Interrupt
 
     // Инициализация (Remap)
     void init(uint8_t offset_master, uint8_t offset_slave);

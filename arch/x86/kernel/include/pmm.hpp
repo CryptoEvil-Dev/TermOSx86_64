@@ -11,10 +11,18 @@ namespace Memory {
     // 1 страница = 4096 байт
     const uint64_t PAGE_SIZE = 4096;
 
+    // Инициализация PMM
     void pmm_init(uint64_t total_memory);
+    
+    // Зарезервировать count страниц, начиная с физического адреса addr
     void pmm_lock_pages(void* addr, uint64_t count);
+
+    // Выделить страницу в 4 Кб
     void* alloc_page();
+
+    // Освободить ранее выделенную страницу
     void free_page(void* addr);
 
+    // Получить внутренний объём физической памяти в байтах
     uint64_t get_free_memory();
 }
