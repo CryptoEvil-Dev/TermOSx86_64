@@ -53,15 +53,17 @@
 - `vfs` - Виртуальная файловая система для поддержки потоков ввода/вывода (stdin, stdout, stderr)
 
 # Как сохранить образ
-
-**Не бутаица!**
-
 - `make image`
 - `sudo dd if=build/flash.img of=/dev/sdX bs=4M status=progress conv=fdatasync`
+
+**Важное условие!**: Для запуска ОС, необходимо иметь виртуальный жесткий диск формата FAT32.
+**Запуск:**
+- `qemu-system-x86_64 -hda TermOS.bin -hdb fat32.img`
 
 # Список полезных команд
 
 - `udisksctl loop-setup -f disk.img`: Смонтировать диск в loop.
 - `udisksctl loop-delete -b /dev/loopN`: Размонтировать loop.
 - `losetup -a | grep disk.img`: Найти loop устройство по диску.
+
 
