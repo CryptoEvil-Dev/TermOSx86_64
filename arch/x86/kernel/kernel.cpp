@@ -21,7 +21,7 @@ extern "C" void _kmain() {
     Memory::pmm_lock_pages((void*)0, 512);
 
     std::cout << "TermOS 64-bit Kernel Started!" << std::endl;
-    std::cout << "PMM INitialized. Free memory: " << std::dec << Memory::get_free_memory() / 1024 / 1024 << " MB" << std::endl;
+    std::cout << "PMM Initialized. Free memory: " << std::dec << Memory::get_free_memory() / 1024 / 1024 << " MB" << std::endl;
 
     Storage::disk_mgr.init();
     
