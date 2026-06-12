@@ -1,0 +1,27 @@
+{
+    "rust-analyzer.cargo.executable": "cargo",
+    "rust-analyzer.check.command": "check",
+    "rust-analyzer.check.overrideCommand": [
+        "cargo",
+        "+nightly",
+        "check",
+        "--workspace",
+        "--message-format=json",
+        "-Z", "json-target-spec",
+        "-Z", "build-std=core,compiler_builtins",
+        "-Z", "build-std-features=compiler-builtins-mem",
+        "--target", "i686-termos.json"
+    ],
+    "rust-analyzer.cargo.extraArgs": [
+        "-Z", "json-target-spec"
+    ],
+    "rust-analyzer.check.extraArgs": [],
+    "rust-analyzer.check.allTargets": false,
+    "rust-analyzer.cargo.allTargets": false,
+    "rust-analyzer.cargo.target": "i686-termos.json",
+    "rust-analyzer.linkedProjects": [
+        "Cargo.toml"
+    ],
+    "rust-analyzer.rustc.source": null,
+    "rust-analyzer.cargo.sysroot": null
+}

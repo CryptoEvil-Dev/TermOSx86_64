@@ -13,11 +13,7 @@ $(ASM_OBJ): boot/primary.asm
 
 # 2. Передаем Cargo флаг для работы с кастомным JSON и включаем автоматический сбор libcore
 cargo_workspace:
-	cargo +nightly build --release --workspace \
-		-Z json-target-spec \
-		-Z build-std=core,compiler_builtins \
-		-Z build-std-features=compiler-builtins-mem \
-		--target i686-termos.json
+	cargo build --release --workspace
 
 # 3. Линкуем первый сектор и вторичный загрузчик на Rust в финальный boot.bin
 $(IMAGE): $(ASM_OBJ) cargo_workspace
