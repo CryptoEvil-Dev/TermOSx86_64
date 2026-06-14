@@ -1,0 +1,14 @@
+[workspace]
+members = [
+    "boot",
+    "kernel",
+    "drivers",
+    "sysshared",
+    "utils"
+]
+resolver = "2" # Явно включаем современный резолвер
+
+[profile.release]
+panic = "abort"
+opt-level = "z"
+lto = true

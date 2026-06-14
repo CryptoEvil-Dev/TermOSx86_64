@@ -1,0 +1,14 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2021"
+autobins = false # ТАКЖЕ ОТКЛЮЧАЕМ ДЛЯ ЯДРА
+
+[lib]
+name = "kernel"
+crate-type = ["staticlib"]
+path = "src/main.rs"
+
+[dependencies]
+sysshared = { path = "../sysshared" }
+drivers = { path = "../drivers" }

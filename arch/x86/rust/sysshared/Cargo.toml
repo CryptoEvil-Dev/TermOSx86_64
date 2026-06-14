@@ -1,0 +1,7 @@
+[package]
+name = "sysshared"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Здесь нет зависимостей, только чистые no_std структуры
