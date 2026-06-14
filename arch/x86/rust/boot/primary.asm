@@ -11,11 +11,11 @@ _start:
     mov ss, ax
     mov sp, 0x7c00
 
-    mov [BOOT_INFO], dl ; Сохраняем номер загрузочного диска
+    mov [BOOT_INFO + 11], dl ; Сохраняем номер загрузочного диска
 
     ; 1. Сбор карты памяти (E820)
     ; Адрес буфера для карты памяти: BOOT_INFO + 8
-    mov di, BOOT_INFO + 8
+    mov di, BOOT_INFO + 14
     xor ebx, ebx
     xor bp, bp
 
@@ -35,25 +35,32 @@ _start:
     jnz .e820_loop
 
 .e820_done:
-    mov [BOOT_INFO + 2], bp     ; Сохраняем итоговое количество записей памяти (2 байта) по адресу BOOT_INFO + 2
+    mov [BOOT_INFO + 12], bp
 
-
-; Настрока графики (VESA VBE)
-; Нам нужно получить параметры режима, что бы узнать адрес фреймбуфера (LFB)
-    mov ax, 0x4F01                  ; Функция возврата информации о режиме
-    mov cx, 0x4118                  ; Номер режима 1024x768x32 + флаг линейного буфера (0x4000)
-    mov di, 0x2000                  ; Временный буфер памяти под структуру VBE Mode Info
+    mov ax, 0x4F01
+    mov cx, 0x411E
+    mov di, 0x2000
     int 0x10
-    cmp ax, 0x004F                  ; Проверяем, поддерживает ли BIOS эту функцию
+    cmp ax, 0x004F
     jne .no_graphics
 
-; Из временной структуры VBE (смещение 40) вытаскиваем физический адрес экрана (LFB)
     mov eax, [0x2000 + 40]
-    mov [BOOT_INFO + 4], eax ; Сохраняем этот адрес в наш BootInfo по адресу BOOT_INFO + 4
+    mov [BOOT_INFO], eax
 
-; Устанавливаем сам видеорежим
+    mov ax, [0x2000 + 18]
+    mov [BOOT_INFO + 4], ax
+
+    mov ax, [0x2000 + 20]
+    mov [BOOT_INFO + 6], ax
+
+    mov al, [0x2000 + 25]
+    mov [BOOT_INFO + 8], al
+
+    mov ax, [0x2000 + 16]
+    mov [BOOT_INFO + 9], ax
+
     mov ax, 0x4F02
-    mov bx, 0x4118
+    mov bx, 0x411E
     int 0x10
 
 
@@ -69,7 +76,7 @@ _start:
     mov [dap.sectors_to_read], ax
 
     ; Восстанавливаем номер диска в структуру DAP
-    mov dl, [BOOT_INFO]
+    mov dl, [BOOT_INFO + 11]
     mov [dap.drive_num], dl
 
     ; Вызываем расширенное чтение BIOS

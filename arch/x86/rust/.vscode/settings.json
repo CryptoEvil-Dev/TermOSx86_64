@@ -16,6 +16,9 @@
         "-Z", "json-target-spec"
     ],
     "rust-analyzer.check.extraArgs": [],
+    "rust-analyzer.cargo.extraEnv": {
+        "RUSTC_BOOTSTRAP": "1"
+    },
     "rust-analyzer.check.allTargets": false,
     "rust-analyzer.cargo.allTargets": false,
     "rust-analyzer.cargo.target": "i686-termos.json",
@@ -23,5 +26,7 @@
         "Cargo.toml"
     ],
     "rust-analyzer.rustc.source": null,
-    "rust-analyzer.cargo.sysroot": null
+    "rust-analyzer.cargo.sysroot": "discover",
+    "rust-analyzer.cargo.buildHtmlDocs": false,
+    "rust-analyzer.cargo.sysrootQueryMetadata": true,
 }
