@@ -1,4 +1,5 @@
 extern _rust_end_marker ; Линковщик сам передаст сюда адрес конца 32-битного загрузчика
+extern _boot32_sectors
 
 [BITS 16]
 global _start
@@ -31,6 +32,8 @@ _start:
 
     add di, 24                  ; Сдвигаем буфер на одну запись вперёд
     add bp, 1                   ; Увеличиваем счётчик на один (add работает быстрее чем inc)
+    cmp bp, 32                  ; Защита от переполнения буфера BootInfo
+    je .e820_done
     test ebx, ebx               ; Если ebx стал 0, то записей больше нет
     jnz .e820_loop
 
@@ -66,15 +69,6 @@ _start:
 
 ; Тут мы идём дальше. Не забывая положить адресу структуры например в EBX
 .no_graphics:
-    ; Динамический расчёт и чтение кода Rust через DAP
-    mov eax, _rust_end_marker   ; Загружаем адрес конца загрузчика
-    sub eax, 0x7E00             ; Отнимаем адрес начала, получаем размер загрузчика
-    shr eax, 9                  ; Сдвигаем регистр вправо на 9 бит = деление на 512
-    add eax, 1                  ; Округляем в большую сторону (+1 сектор про запас)
-
-    ; Записываем результат в DAP
-    mov [dap.sectors_to_read], ax
-
     ; Восстанавливаем номер диска в структуру DAP
     mov dl, [BOOT_INFO + 11]
     mov [dap.drive_num], dl
@@ -84,11 +78,6 @@ _start:
     mov si, dap         ; DS:SI указывает на структуру DAP
     int 0x13
     jc .disk_error      ; Ошибка чтения диска -> Зависаем
-
-; 4. Проверка магической сигнатуры
-    mov ebx, [_rust_end_marker]
-    cmp ebx, 0x0BADB002             ; Проверяем, на месте ли число
-    jne  .signature_error           ; Если магия не совпала -> Зависаем
 
 
 ; 5. Переход в 32 бита
@@ -109,42 +98,40 @@ _start:
 
 .signature_error:
 .disk_error:
+    mov eax, [BOOT_INFO]
+    test eax, eax
+    jz .pure_hang
+    ; Если LFB доступен, зальём верхний левый угол красным
+    mov dword [eax], 0x00FF0000
+.pure_hang
     jmp $
 
 
 section .text
 align 4
 dap:
-    db 0x10
-    db 0x00
+    db 0x10                     ; Размер структуры DAP
+    db 0x00                     ; Резерв
 .sectors_to_read:
-    dw 0x0000
+    dw _boot32_sectors                   ; Сюда запишется число секторов
 .buffer_offset:
-    dw 0x7E00
+    dw 0x7E00                   ; Адрес загрузки в памяти
 .buffer_segment:
-    dw 0x0000
+    dw 0x0000                   ; Сегмент 0
 .lba_start_low:
-    dd 0x00000001
+    dd 0x00000001               ; Начинаем читать со 2-го сектора диска (LBA 1)
 .lba_start_high:
     dd 0x00000000
 .drive_num:
     db 0x00
 
-align 4
+align 8
 gdt_start:
-    dq 0x0000000000000000
-    dw 0xFFFF
-    dw 0x0000
-    db 0x00
-    db 0x9A
-    db 0xCF
-    db 0x00
-    dw 0xFFFF
-    dw 0x0000
-    db 0x00
-    db 0x92
-    db 0xCF
-    db 0x00
+    dq 0x0000000000000000       ; Нулевой дескриптор
+    ; Кодовый сегмент: Base=0, Limit=0xFFFFF, Granularity=4KB, 32-bit, Present, Ring 0
+    dw 0xFFFF, 0x0000, 0x9A00, 0x00CF
+    ; Сегмент данных: Base=0, Limit=0xFFFFF, Granularity=4KB, 32-bit, Present, Ring 0
+    dw 0xFFFF, 0x0000, 0x9200, 0x00CF
 gdt_end:
 
 align 4
@@ -163,9 +150,10 @@ section .bootpm
 [BITS 32]
 
 global init_pm
-extern _kboot
+extern _kboot ; Возвращаем оригинальное имя вашей функции из Rust!
 
 init_pm:
+    ; Немедленно настраиваем сегменты данных на селектор 0x10 (Data Descriptor)
     mov ax, 0x10
     mov ds, ax
     mov es, ax
@@ -173,12 +161,18 @@ init_pm:
     mov gs, ax
     mov ss, ax
 
+    ; Настраиваем стек в гарантированно безопасной зоне
     mov esp, 0x90000
     mov ebp, esp
 
+    ; Выравнивание стека по 16 байт для Rust ABI
     and esp, 0xFFFFFFF0
 
-    call _kboot
+    ; Передаем управление в Rust через абсолютный вызов по адресу.
+    ; Линкер запишет в EAX точный физический адрес функции _kboot,
+    ; что исключит любые проблемы с относительными смещениями в памяти!
+    mov eax, _kboot
+    call eax
 
 .hang:
     jmp $

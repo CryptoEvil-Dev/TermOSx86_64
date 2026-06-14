@@ -21,6 +21,7 @@ dependencies = [
 name = "secondary_boot"
 version = "0.1.0"
 dependencies = [
+ "drivers",
  "sysshared",
 ]
 

@@ -1,5 +1,7 @@
 #![no_std]
 
+pub use core::fmt::Write; 
+
 #[derive(Copy, Clone)]
 #[repr(C, packed)]
 pub struct MemoryMapEntry {
@@ -23,4 +25,24 @@ pub struct BootInfo {
     pub boot_drive: u8,                     // Смещение 11
     pub memory_map_count: u16,              // Смещение 12
     pub memory_map: [MemoryMapEntry; 32],   // Смещение 14
+}
+
+
+#[macro_export]
+macro_rules! kprint {
+    ($console:expr, $($arg:tt)*) => {
+        // Макрос сам берет изменяемую ссылку, избавляя вас от рутины
+        let _ = core::fmt::write(&mut $console, format_args!($($arg)*));
+    };
+}
+
+#[macro_export]
+macro_rules! kprintln {
+    ($console:expr) => {
+        $console.write_char('\n');
+    };
+    ($console:expr, $($arg:tt)*) => {
+        let _ = core::fmt::write(&mut $console, format_args!($($arg)*));
+        $console.write_char('\n');
+    };
 }

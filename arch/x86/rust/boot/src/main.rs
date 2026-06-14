@@ -2,48 +2,44 @@
 #![no_main]
 
 use core::panic::PanicInfo;
-use sysshared::BootInfo; // Используем тип из общего модуля!
+use sysshared::BootInfo;
+use drivers::FramebufferConsole;
+
+// Импортируем макросы из sysshared
+use sysshared::{kprint, kprintln};
+
+const VGA_FONT: &[u8; 4096] = include_bytes!("vga_font.bin");
 
 #[no_mangle]
 pub extern "C" fn _kboot() -> ! {
     let boot_info = unsafe { &*(0x0500 as *const BootInfo) };
-    
-    let lfb_base = boot_info.framebuffer_addr;
-    let width = boot_info.screen_width as u32;
-    let height = boot_info.screen_height as u32;
-    let pitch = boot_info.pitch as u32;
+
+    // Копируем значения из упакованной структуры в локальные выровненные переменные
+    let boot_drive = boot_info.boot_drive;
+    let width = boot_info.screen_width;
+    let height = boot_info.screen_height;
     let bpp = boot_info.bpp;
+    let fb_addr = boot_info.framebuffer_addr;
+    let mmap_count = boot_info.memory_map_count;
 
-    unsafe {
-        for y in 0..height {
-            // Вычисляем начало текущей строки в байтах
-            let row_offset = y * pitch;
+    let mut console = FramebufferConsole::new(boot_info, VGA_FONT);
+    console.clear(); 
 
-            for x in 0..width {
-                if bpp == 32 {
-                    // Честный 32-битный режим (4 байта на пиксель)
-                    let pixel_ptr = (lfb_base + row_offset + (x * 4)) as *mut u32;
-                    pixel_ptr.write_volatile(0x00003300); // ARGB (Тёмно-зелёный)
-                } else if bpp == 16 {
-                    // 16-битный режим (2 байта на пиксель, RGB565)
-                    let pixel_ptr = (lfb_base + row_offset + (x * 2)) as *mut u16;
-                    // В RGB565 тёмно-зелёный цвет (0, 25, 0) кодируется как 0x0320
-                    pixel_ptr.write_volatile(0x0320); 
-                } else if bpp == 24 {
-                    // 24-битный режим (3 байта на пиксель)
-                    let pixel_ptr = (lfb_base + row_offset + (x * 3)) as *mut u8;
-                    pixel_ptr.write_volatile(0x00); // B
-                    pixel_ptr.add(1).write_volatile(0x33); // G
-                    pixel_ptr.add(2).write_volatile(0x00); // R
-                }
-            }
-        }
-    } 
+    // Теперь передаем в макрос безопасные локальные переменные
+    kprintln!(console, "TERMOS Secondary Bootloader Successfully Started!");
+    kprintln!(console, "-------------------------------------------------");
+    kprintln!(console, "Boot Drive ID : 0x{:X}", boot_drive);
+    kprintln!(console, "Screen Size   : {}x{} @ {}bpp", width, height, bpp);
+    kprintln!(console, "Framebuffer   : 0x{:X}", fb_addr);
+    kprintln!(console, "Memory Map Cnt: {}", mmap_count);
+    kprintln!(console, "");
 
-    loop {}
+    console.write_str("kernel_shell ");
+
+    loop {
+        console.update_cursor();
+    }
 }
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {}
-}
+fn panic(_info: &PanicInfo) -> ! { loop {} }

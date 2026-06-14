@@ -11,3 +11,4 @@ path = "src/main.rs"
 
 [dependencies]
 sysshared = { path = "../sysshared" }
+drivers ={ path = "../drivers" }
