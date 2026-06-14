@@ -34,7 +34,30 @@ pub extern "C" fn _kboot() -> ! {
     kprintln!(console, "Memory Map Cnt: {}", mmap_count);
     kprintln!(console, "");
 
-    console.write_str("kernel_shell ");
+    console.write_str("kernel_shell \n");
+
+    for i in 0..boot_info.memory_map_count as usize {
+        let entry = boot_info.memory_map[i];
+
+        let base = entry.base_address;
+        let length = entry.length;
+        let mem_type = entry.entry_type;
+
+        let type_str = match mem_type {
+            1 => "Available RAM",
+            2 => "Reserved BIOS",
+            3 => "ACPI Reclaim ",
+            4 => "ACPI NVS     ",
+            _ => "Unknown      ",
+        };
+
+        kprintln!(console,
+            "  Reg [{}]: Base: 0x{:X} | Length: 0x{:X} | Type: {} (0x{:X})",
+            i, base, length, type_str, mem_type
+        );
+        kprintln!(console, "----------------------------------");
+        kprintln!(console, "");
+    }
 
     loop {
         console.update_cursor();
